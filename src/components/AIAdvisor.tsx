@@ -81,10 +81,7 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
           const result = event.results[event.results.length - 1];
           const transcriptText = result[0].transcript;
           setTranscript(transcriptText);
-
-          if (result.isFinal) {
-            handleQuestion(transcriptText);
-          }
+          // Nečekáme na isFinal - uživatel musí potvrdit Enterem
         };
 
         recognitionRef.current.onerror = () => {
@@ -409,18 +406,67 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
           <div className="text-center mb-4">
             <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-400 px-4 py-2 rounded-full">
               <span className="animate-pulse">●</span>
-              Poslouchám...
+              Poslouchám... (mluv a pak stiskni Enter)
             </div>
           </div>
         )}
 
-        {/* Transcript */}
+        {/* Text input když není transcript */}
+        {!transcript && card && !isListening && (
+          <div className="mb-4 bg-[#1a1a2e] rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-gray-400 mb-2">
+              Nebo napiš svou otázku:
+            </h4>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && e.currentTarget.value.trim() && !isLoading) {
+                    setTranscript(e.currentTarget.value);
+                    handleQuestion(e.currentTarget.value);
+                  }
+                }}
+                className="flex-1 bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-lg px-4 py-2 text-white focus:border-[#FFCB05] focus:outline-none"
+                placeholder="Napiš otázku a stiskni Enter..."
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Transcript s možností úpravy a potvrzení */}
         {transcript && (
           <div className="mb-4 bg-[#1a1a2e] rounded-xl p-4">
-            <h4 className="text-sm font-semibold text-gray-400 mb-1">
-              Tvoje otázka:
+            <h4 className="text-sm font-semibold text-gray-400 mb-2">
+              Tvoje otázka (uprav a stiskni Enter pro odeslání):
             </h4>
-            <p className="text-white">{transcript}</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && transcript.trim() && !isLoading) {
+                    handleQuestion(transcript);
+                  }
+                }}
+                className="flex-1 bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-lg px-4 py-2 text-white focus:border-[#FFCB05] focus:outline-none"
+                placeholder="Napiš nebo řekni svou otázku..."
+                disabled={isLoading}
+              />
+              <button
+                onClick={() => handleQuestion(transcript)}
+                disabled={!transcript.trim() || isLoading}
+                className="pokemon-btn-yellow pokemon-btn px-4 py-2 disabled:opacity-50"
+              >
+                {isLoading ? "..." : "Odeslat"}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Stiskni Enter pro odeslání otázky
+            </p>
           </div>
         )}
 
