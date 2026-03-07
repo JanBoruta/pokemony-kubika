@@ -11,8 +11,6 @@
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
-    "cloudinary": "^2.9.0",
-    "heic2any": "^0.0.4",
     "jpeg-js": "^0.4.4",
     "libheif-js": "^1.19.8",
     "lucide-react": "^0.577.0",
@@ -21,7 +19,6 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
-    "sharp": "^0.34.5",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
