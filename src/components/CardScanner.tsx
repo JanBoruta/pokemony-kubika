@@ -82,111 +82,61 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
     }
   };
 
-  // Konverze HEIC přes nativní canvas (funguje na Safari/iOS)
-  const convertViaCanvas = async (file: File): Promise<File> => {
-    const url = URL.createObjectURL(file);
+  // Upload HEIC do Cloudinary a získání JPEG URL
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
 
-    try {
-      const img = new Image();
-
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Browser cannot decode this image"));
-        img.src = url;
-      });
-
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas not supported");
-
-      ctx.drawImage(img, 0, 0);
-
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", 0.9)
-      );
-
-      if (!blob) throw new Error("JPEG export failed");
-
-      return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), {
-        type: "image/jpeg",
-      });
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  // Fallback konverze pomocí heic2any
-  const convertViaHeic2any = async (file: File): Promise<File> => {
-    const heic2any = (await import("heic2any")).default;
-
-    const result = await heic2any({
-      blob: file,
-      toType: "image/jpeg",
-      quality: 0.85,
+    const response = await fetch("/api/upload-image", {
+      method: "POST",
+      body: formData,
     });
 
-    const convertedBlob = Array.isArray(result) ? result[0] : result;
+    const data = await response.json();
 
-    return new File(
-      [convertedBlob as Blob],
-      file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-      { type: "image/jpeg" }
-    );
+    if (!response.ok) {
+      throw new Error(data.error || "Upload do Cloudinary selhal");
+    }
+
+    return data.jpg_url;
   };
 
   const processCard = async (card: ScannedCard) => {
     console.log("[CardScanner] Processing card:", card.file.name, "Type:", card.file.type, "Size:", card.file.size);
 
     try {
-      let processedFile = card.file;
-      let previewUrl = card.previewUrl;
       const isHeic = card.file.type === "image/heic" ||
                      card.file.type === "image/heif" ||
                      card.file.name.toLowerCase().endsWith(".heic") ||
                      card.file.name.toLowerCase().endsWith(".heif");
 
-      // Pro HEIC/HEIF konvertujeme na klientovi
+      let apiPayload: { image?: string; imageUrl?: string };
+
+      // Pro HEIC použijeme Cloudinary pro konverzi
       if (isHeic) {
-        console.log("[CardScanner] HEIC detected, converting to JPEG...");
-        updateCard(card.id, { status: "converting", statusText: "Konvertuji HEIC na JPEG..." });
+        console.log("[CardScanner] HEIC detected, uploading to Cloudinary...");
+        updateCard(card.id, { status: "converting", statusText: "Nahrávám HEIC do cloudu..." });
 
-        // 1. Zkus nativní canvas (funguje na Safari/iOS)
-        try {
-          console.log("[CardScanner] Trying native canvas conversion...");
-          processedFile = await convertViaCanvas(card.file);
-          previewUrl = URL.createObjectURL(processedFile);
-          updateCard(card.id, { previewUrl });
-          console.log("[CardScanner] Native canvas conversion successful, size:", processedFile.size);
-        } catch (canvasError) {
-          console.log("[CardScanner] Native canvas failed, trying heic2any...", canvasError);
+        const jpgUrl = await uploadToCloudinary(card.file);
+        console.log("[CardScanner] Cloudinary upload successful:", jpgUrl);
 
-          // 2. Fallback na heic2any
-          try {
-            processedFile = await convertViaHeic2any(card.file);
-            previewUrl = URL.createObjectURL(processedFile);
-            updateCard(card.id, { previewUrl });
-            console.log("[CardScanner] heic2any conversion successful, size:", processedFile.size);
-          } catch (heicError) {
-            console.error("[CardScanner] Both conversion methods failed:", heicError);
-            throw new Error("Nepodařilo se zpracovat HEIC. Zkus fotku vyfotit znovu jako JPEG (v nastavení iPhone: Nastavení > Fotoaparát > Formáty > Nejkompatibilnější).");
-          }
+        // Nastav náhled z Cloudinary URL
+        updateCard(card.id, { previewUrl: jpgUrl });
+
+        apiPayload = { imageUrl: jpgUrl };
+      } else {
+        // Pro ostatní formáty použijeme base64
+        console.log("[CardScanner] Converting to base64...");
+        updateCard(card.id, { status: "uploading", statusText: "Nahrávám fotku..." });
+
+        const base64 = await fileToBase64(card.file);
+        console.log("[CardScanner] Base64 length:", base64.length);
+
+        if (!base64 || !base64.startsWith("data:image/")) {
+          throw new Error("Nepodařilo se převést obrázek na base64");
         }
-      }
 
-      // Nahrávání
-      console.log("[CardScanner] Converting to base64...");
-      updateCard(card.id, { status: "uploading", statusText: "Nahrávám fotku..." });
-
-      // Konvertuj na base64
-      const base64 = await fileToBase64(processedFile);
-      console.log("[CardScanner] Base64 length:", base64.length, "First 100 chars:", base64.substring(0, 100));
-
-      // Zkontroluj validitu base64
-      if (!base64 || !base64.startsWith("data:image/")) {
-        throw new Error("Nepodařilo se převést obrázek na base64");
+        apiPayload = { image: base64 };
       }
 
       // AI analýza
@@ -196,7 +146,7 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
       const response = await fetch("/api/scan-card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64 }),
+        body: JSON.stringify(apiPayload),
       });
 
       console.log("[CardScanner] API response status:", response.status);
@@ -218,7 +168,7 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
       updateCard(card.id, { status: "searching", statusText: `Hledám "${data.result.name}"...` });
 
       const searchQuery = data.result.name;
-      const searchResult = await searchCards(searchQuery, 1, 30); // Načti více pro filtrování
+      const searchResult = await searchCards(searchQuery, 1, 30);
       let matchedCards = searchResult.data || [];
       console.log("[CardScanner] Initial search results:", matchedCards.length);
 
@@ -249,10 +199,10 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
 
       // Filtruj podle čísla karty pokud je známé
       if (data.result.number && matchedCards.length > 1) {
-        const targetNumber = data.result.number.split("/")[0]; // "025/198" -> "025"
+        const targetNumber = data.result.number.split("/")[0];
         const numberFiltered = matchedCards.filter(c =>
           c.localId === targetNumber ||
-          c.localId === targetNumber.replace(/^0+/, "") // odstranění vedoucích nul
+          c.localId === targetNumber.replace(/^0+/, "")
         );
         if (numberFiltered.length > 0) {
           matchedCards = numberFiltered;

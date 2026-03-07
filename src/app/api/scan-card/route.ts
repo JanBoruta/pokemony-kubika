@@ -20,20 +20,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Neplatný JSON v požadavku" }, { status: 400 });
     }
 
-    const { image } = body;
+    const { image, imageUrl } = body;
 
-    if (!image) {
-      console.log("[scan-card] Missing image");
+    // Podporujeme base64 data URL nebo HTTPS URL (z Cloudinary)
+    let finalImageUrl: string;
+
+    if (imageUrl && imageUrl.startsWith("https://")) {
+      // URL z Cloudinary nebo jiného CDN
+      console.log("[scan-card] Using image URL:", imageUrl.substring(0, 80));
+      finalImageUrl = imageUrl;
+    } else if (image && image.startsWith("data:image/")) {
+      // Base64 data URL
+      console.log("[scan-card] Using base64 image, size:", Math.round(image.length / 1024), "KB");
+
+      // Extrahuj MIME type
+      const matches = image.match(/^data:([^;]+);base64,/);
+      if (!matches) {
+        return NextResponse.json(
+          { error: "Neplatný formát base64 obrázku" },
+          { status: 400 }
+        );
+      }
+
+      const mimeType = matches[1].toLowerCase();
+      console.log("[scan-card] MIME type:", mimeType);
+
+      // Zkontroluj podporované formáty (OpenAI Vision)
+      const supportedFormats = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"];
+      if (!supportedFormats.includes(mimeType)) {
+        console.log("[scan-card] Unsupported format:", mimeType);
+        return NextResponse.json(
+          { error: `Nepodporovaný formát (${mimeType}). Použij JPEG, PNG, GIF nebo WebP.` },
+          { status: 400 }
+        );
+      }
+
+      finalImageUrl = image;
+    } else {
+      console.log("[scan-card] Missing or invalid image");
       return NextResponse.json({ error: "Chybí obrázek" }, { status: 400 });
-    }
-
-    // Validuj base64 formát
-    if (!image.startsWith("data:image/")) {
-      console.log("[scan-card] Invalid image format, starts with:", image.substring(0, 50));
-      return NextResponse.json(
-        { error: "Neplatný formát obrázku. Očekává se JPEG nebo PNG." },
-        { status: 400 }
-      );
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -43,30 +68,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "OpenAI API není nakonfigurován. Kontaktuj správce." },
         { status: 500 }
-      );
-    }
-
-    console.log("[scan-card] Image size:", Math.round(image.length / 1024), "KB");
-
-    // Extrahuj MIME type
-    const matches = image.match(/^data:([^;]+);base64,/);
-    if (!matches) {
-      return NextResponse.json(
-        { error: "Neplatný formát base64 obrázku" },
-        { status: 400 }
-      );
-    }
-
-    const mimeType = matches[1].toLowerCase();
-    console.log("[scan-card] MIME type:", mimeType);
-
-    // Zkontroluj podporované formáty (OpenAI Vision)
-    const supportedFormats = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"];
-    if (!supportedFormats.includes(mimeType)) {
-      console.log("[scan-card] Unsupported format:", mimeType);
-      return NextResponse.json(
-        { error: `Nepodporovaný formát (${mimeType}). Použij JPEG, PNG, GIF nebo WebP.` },
-        { status: 400 }
       );
     }
 
@@ -109,7 +110,7 @@ Příklad správné odpovědi: {"name":"Pikachu","set":"Scarlet & Violet","numbe
               {
                 type: "image_url",
                 image_url: {
-                  url: image,
+                  url: finalImageUrl,
                   detail: "high"
                 }
               }
