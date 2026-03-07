@@ -68,14 +68,41 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      {/* Header */}
-      <header className="py-8 px-4">
-        <div className="container mx-auto text-center">
+      {/* Header - Indigo League styl */}
+      <header className="py-8 px-4 relative overflow-hidden">
+        {/* Pikachu ilustrace */}
+        <div className="absolute -left-8 md:left-8 top-1/2 -translate-y-1/2 opacity-20 md:opacity-40 pointer-events-none">
+          <img
+            src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"
+            alt="Pikachu"
+            className="w-32 md:w-48 h-auto drop-shadow-2xl animate-bounce"
+            style={{ animationDuration: '3s' }}
+          />
+        </div>
+        <div className="absolute -right-8 md:right-8 top-1/2 -translate-y-1/2 opacity-20 md:opacity-40 pointer-events-none">
+          <img
+            src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png"
+            alt="Charizard"
+            className="w-32 md:w-48 h-auto drop-shadow-2xl"
+            style={{ transform: 'scaleX(-1)' }}
+          />
+        </div>
+        <div className="container mx-auto text-center relative z-10">
+          {/* Pokéball dekorace nad logem */}
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-b from-red-500 to-red-700 border-4 border-gray-700 relative">
+              <div className="absolute inset-x-0 top-1/2 h-1 bg-gray-700 -translate-y-1/2"></div>
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-2 border-gray-700"></div>
+            </div>
+          </div>
           <h1 className="pokemon-logo text-4xl md:text-6xl font-bold mb-2">
             Pokémony Kubíka
           </h1>
-          <p className="text-gray-400 text-lg">
+          <p className="text-gray-300 text-lg font-medium">
             Hledej, porovnávej a objevuj svět Pokémon karet
+          </p>
+          <p className="text-yellow-500 text-sm mt-2 font-semibold tracking-wider">
+            ⚡ INDIGO LEAGUE EDICE ⚡
           </p>
         </div>
       </header>

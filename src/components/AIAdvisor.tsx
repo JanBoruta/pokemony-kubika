@@ -126,8 +126,53 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
     }
   };
 
-  const speak = (text: string) => {
-    if (!synthRef.current) return;
+  const speak = async (text: string) => {
+    // Nejprve zkusíme Azure TTS
+    try {
+      setIsSpeaking(true);
+
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      // Pokud máme audio odpověď (ne JSON s fallback)
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("audio")) {
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+
+        audio.onended = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+        };
+        audio.onerror = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+          // Fallback na browser TTS
+          speakWithBrowser(text);
+        };
+
+        await audio.play();
+        return;
+      }
+
+      // Fallback na browser TTS
+      speakWithBrowser(text);
+    } catch (error) {
+      console.error("TTS error:", error);
+      speakWithBrowser(text);
+    }
+  };
+
+  // Fallback funkce pro browser TTS
+  const speakWithBrowser = (text: string) => {
+    if (!synthRef.current) {
+      setIsSpeaking(false);
+      return;
+    }
 
     synthRef.current.cancel();
     const utterance = new SpeechSynthesisUtterance(text);

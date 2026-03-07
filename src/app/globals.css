@@ -1,31 +1,35 @@
 @import "tailwindcss";
 
 :root {
-  /* Pokémon barvy */
-  --pokemon-yellow: #FFCB05;
-  --pokemon-blue: #3B4CCA;
-  --pokemon-blue-light: #6890F0;
-  --pokemon-red: #CC0000;
-  --pokemon-dark: #1a1a2e;
-  --pokemon-darker: #16213e;
+  /* Pokémon Indigo League barvy - klasický 90s styl */
+  --pokemon-yellow: #FFD700;
+  --pokemon-gold: #DAA520;
+  --pokemon-blue: #1E3A8A;
+  --pokemon-blue-light: #3B82F6;
+  --pokemon-red: #DC2626;
+  --pokemon-red-dark: #991B1B;
+  --pokemon-dark: #0C1929;
+  --pokemon-darker: #060D15;
+  --pokemon-cream: #FDF6E3;
+  --pokemon-orange: #F97316;
 
-  /* Typy Pokémonů */
-  --type-grass: #78C850;
-  --type-fire: #F08030;
-  --type-water: #6890F0;
-  --type-electric: #F8D030;
-  --type-psychic: #F85888;
-  --type-fighting: #C03028;
-  --type-darkness: #705848;
-  --type-metal: #B8B8D0;
-  --type-fairy: #EE99AC;
-  --type-dragon: #7038F8;
-  --type-colorless: #A8A878;
+  /* Typy Pokémonů - Indigo League paleta */
+  --type-grass: #22C55E;
+  --type-fire: #EF4444;
+  --type-water: #3B82F6;
+  --type-electric: #FACC15;
+  --type-psychic: #D946EF;
+  --type-fighting: #EA580C;
+  --type-darkness: #374151;
+  --type-metal: #9CA3AF;
+  --type-fairy: #F472B6;
+  --type-dragon: #8B5CF6;
+  --type-colorless: #D1D5DB;
 
-  --background: #0f0f23;
+  --background: #0C1929;
   --foreground: #ffffff;
-  --card-bg: #1a1a2e;
-  --card-border: #3B4CCA;
+  --card-bg: #1E293B;
+  --card-border: #DC2626;
 }
 
 @theme inline {
@@ -40,21 +44,49 @@
 }
 
 body {
-  background: linear-gradient(135deg, var(--pokemon-dark) 0%, var(--pokemon-darker) 100%);
+  background:
+    radial-gradient(ellipse at top, rgba(220, 38, 38, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(30, 58, 138, 0.2) 0%, transparent 50%),
+    linear-gradient(180deg, var(--pokemon-dark) 0%, var(--pokemon-darker) 100%);
   color: var(--foreground);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   min-height: 100vh;
+  position: relative;
 }
 
-/* Pokémon card hover efekt */
+/* Indigo League retro pattern overlay */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 215, 0, 0.02) 2px,
+      rgba(255, 215, 0, 0.02) 4px
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Pokémon card hover efekt - Indigo League styl */
 .pokemon-card {
   transition: all 0.3s ease;
   transform-style: preserve-3d;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .pokemon-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 20px 40px rgba(59, 76, 202, 0.4);
+  transform: translateY(-8px) scale(1.02) rotateX(2deg);
+  box-shadow:
+    0 20px 40px rgba(220, 38, 38, 0.3),
+    0 0 30px rgba(255, 215, 0, 0.2);
 }
 
 /* Typ badge styly */
@@ -79,17 +111,25 @@ body {
 .type-dragon { background: var(--type-dragon); }
 .type-colorless { background: var(--type-colorless); color: #333; }
 
-/* Glowing efekt pro vzácné karty */
+/* Glowing efekt pro vzácné karty - Indigo League zlatý záblesk */
 .glow-rare {
   animation: glow 2s ease-in-out infinite alternate;
+  border: 3px solid var(--pokemon-gold);
 }
 
 @keyframes glow {
   from {
-    box-shadow: 0 0 10px var(--pokemon-yellow), 0 0 20px var(--pokemon-yellow);
+    box-shadow:
+      0 0 10px var(--pokemon-yellow),
+      0 0 20px var(--pokemon-yellow),
+      inset 0 0 10px rgba(255, 215, 0, 0.1);
   }
   to {
-    box-shadow: 0 0 20px var(--pokemon-yellow), 0 0 40px var(--pokemon-yellow);
+    box-shadow:
+      0 0 25px var(--pokemon-yellow),
+      0 0 50px var(--pokemon-yellow),
+      0 0 75px rgba(255, 215, 0, 0.3),
+      inset 0 0 20px rgba(255, 215, 0, 0.2);
   }
 }
 
@@ -132,72 +172,126 @@ input::placeholder, textarea::placeholder {
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Button styling */
+/* Button styling - Indigo League Poké Ball styl */
 .pokemon-btn {
-  background: linear-gradient(135deg, var(--pokemon-blue) 0%, var(--pokemon-blue-light) 100%);
+  background: linear-gradient(180deg, var(--pokemon-red) 0%, var(--pokemon-red-dark) 50%, #1E293B 50%, #0F172A 100%);
   color: white;
-  border: none;
+  border: 3px solid #374151;
   padding: 12px 24px;
-  border-radius: 12px;
-  font-weight: 600;
+  border-radius: 50px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pokemon-btn::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: 3px solid #374151;
+  border-radius: 50%;
+  z-index: 1;
 }
 
 .pokemon-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 76, 202, 0.4);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    0 10px 30px rgba(220, 38, 38, 0.4),
+    0 0 20px rgba(255, 215, 0, 0.3);
+  border-color: var(--pokemon-yellow);
 }
 
 .pokemon-btn-yellow {
-  background: linear-gradient(135deg, var(--pokemon-yellow) 0%, #FFD700 100%);
+  background: linear-gradient(180deg, var(--pokemon-yellow) 0%, var(--pokemon-gold) 100%);
   color: var(--pokemon-dark);
+  border-color: var(--pokemon-gold);
+}
+
+.pokemon-btn-yellow::before {
+  background: var(--pokemon-dark);
+  border-color: var(--pokemon-gold);
 }
 
 .pokemon-btn-red {
-  background: linear-gradient(135deg, var(--pokemon-red) 0%, #FF4444 100%);
+  background: linear-gradient(180deg, #EF4444 0%, #B91C1C 100%);
+  border-color: #991B1B;
 }
 
-/* Logo styling */
+.pokemon-btn-red::before {
+  display: none;
+}
+
+/* Logo styling - Indigo League klasický vzhled */
 .pokemon-logo {
-  font-family: 'Pokemon Solid', 'Arial Black', sans-serif;
+  font-family: 'Arial Black', 'Impact', sans-serif;
   color: var(--pokemon-yellow);
   text-shadow:
-    3px 3px 0 var(--pokemon-blue),
-    -1px -1px 0 var(--pokemon-blue),
-    1px -1px 0 var(--pokemon-blue),
-    -1px 1px 0 var(--pokemon-blue);
+    4px 4px 0 var(--pokemon-blue),
+    -2px -2px 0 var(--pokemon-blue),
+    2px -2px 0 var(--pokemon-blue),
+    -2px 2px 0 var(--pokemon-blue),
+    0 6px 0 rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+  -webkit-text-stroke: 2px var(--pokemon-blue);
 }
 
-/* Glassmorphism efekt */
+/* Glass efekt - Indigo League styl */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  border: 2px solid rgba(255, 215, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-/* Autocomplete dropdown */
+/* Autocomplete dropdown - Pokédex styl */
 .autocomplete-dropdown {
-  background: var(--card-bg);
-  border: 2px solid var(--pokemon-blue);
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+  border: 3px solid var(--pokemon-red);
+  border-radius: 16px;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   overflow: hidden;
 }
 
 .autocomplete-item {
   padding: 12px 16px;
   cursor: pointer;
-  transition: background 0.2s ease;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(220, 38, 38, 0.3);
 }
 
 .autocomplete-item:hover {
-  background: rgba(59, 76, 202, 0.3);
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.3) 0%, rgba(255, 215, 0, 0.1) 100%);
+  padding-left: 24px;
 }
 
 .autocomplete-item:last-child {
   border-bottom: none;
+}
+
+/* Indigo League dekorativní prvky */
+.indigo-border {
+  border: 3px solid;
+  border-image: linear-gradient(135deg, var(--pokemon-red), var(--pokemon-yellow), var(--pokemon-blue)) 1;
+}
+
+/* Pokéball dekorace */
+.pokeball-decoration::after {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(180deg, #DC2626 50%, white 50%);
+  border-radius: 50%;
+  border: 3px solid #374151;
 }
