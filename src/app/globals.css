@@ -309,9 +309,9 @@ input::placeholder, textarea::placeholder {
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Button styling - Indigo League Poké Ball styl */
+/* Button styling - Indigo League styl */
 .pokemon-btn {
-  background: linear-gradient(180deg, var(--pokemon-red) 0%, var(--pokemon-red-dark) 50%, #1E293B 50%, #0F172A 100%);
+  background: linear-gradient(180deg, var(--pokemon-red) 0%, var(--pokemon-red-dark) 100%);
   color: white;
   border: 3px solid #374151;
   padding: 12px 24px;
@@ -321,22 +321,6 @@ input::placeholder, textarea::placeholder {
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 1px;
-  position: relative;
-  overflow: hidden;
-}
-
-.pokemon-btn::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 16px;
-  height: 16px;
-  background: white;
-  border: 3px solid #374151;
-  border-radius: 50%;
-  z-index: 1;
 }
 
 .pokemon-btn:hover {
@@ -353,18 +337,9 @@ input::placeholder, textarea::placeholder {
   border-color: var(--pokemon-gold);
 }
 
-.pokemon-btn-yellow::before {
-  background: var(--pokemon-dark);
-  border-color: var(--pokemon-gold);
-}
-
 .pokemon-btn-red {
   background: linear-gradient(180deg, #EF4444 0%, #B91C1C 100%);
   border-color: #991B1B;
-}
-
-.pokemon-btn-red::before {
-  display: none;
 }
 
 /* Logo styling - Indigo League klasický vzhled */
