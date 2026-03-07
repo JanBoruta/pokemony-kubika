@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PokemonCard, typeTranslations, rarityTranslations } from "@/types/pokemon";
 import { useCollectionStore, CollectionItem } from "@/store/collectionStore";
-import { X, Trash2, Plus, Minus, Edit3, Check, BookOpen, Filter } from "lucide-react";
+import { X, Trash2, Plus, Minus, Edit3, Check, BookOpen, Filter, Heart } from "lucide-react";
 
 interface CollectionProps {
   onClose: () => void;
@@ -11,10 +11,11 @@ interface CollectionProps {
 }
 
 export default function Collection({ onClose, onSelectCard }: CollectionProps) {
-  const { items, removeCard, updateQuantity, updateNotes } = useCollectionStore();
+  const { items, removeCard, updateQuantity, updateNotes, addFavorite, removeFavorite, isFavorite } = useCollectionStore();
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [tempNotes, setTempNotes] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [filterRarity, setFilterRarity] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"name" | "date" | "rarity">("date");
 
   const translateType = (type: string) => typeTranslations[type] || type;
@@ -39,10 +40,35 @@ export default function Collection({ onClose, onSelectCard }: CollectionProps) {
     return Array.from(types);
   };
 
+  const getUniqueRarities = () => {
+    const rarities = new Set<string>();
+    items.forEach((item) => {
+      if (item.card.rarity) rarities.add(item.card.rarity);
+    });
+    return Array.from(rarities).sort();
+  };
+
+  // Funkce pro určení úrovně vzácnosti (pro vizuální efekty)
+  const getRarityLevel = (rarity?: string): "common" | "uncommon" | "rare" | "ultra" | "secret" => {
+    if (!rarity) return "common";
+    const r = rarity.toLowerCase();
+    // Secret - nejcennější
+    if (r.includes("secret") || r.includes("special art") || r.includes("hyper") || r.includes("gold")) return "secret";
+    // Ultra - velmi vzácné (ex, V, VMAX, VSTAR, Full Art, Alt Art)
+    if (r.includes("ultra") || r.includes("full art") || r.includes("alt") || r.includes("illustration") ||
+        r.includes("vmax") || r.includes("vstar") || r.includes("v ") || r.includes(" v")) return "ultra";
+    // Rare - vzácné (Rare Holo, Rare, ex karty)
+    if (r.includes("rare") || r.includes("holo") || r.includes(" ex") || r.includes("ex ")) return "rare";
+    // Uncommon
+    if (r.includes("uncommon")) return "uncommon";
+    return "common";
+  };
+
   const filteredAndSortedItems = items
     .filter((item) => {
-      if (filterType === "all") return true;
-      return item.card.types?.includes(filterType);
+      const typeMatch = filterType === "all" || item.card.types?.includes(filterType);
+      const rarityMatch = filterRarity === "all" || item.card.rarity === filterRarity;
+      return typeMatch && rarityMatch;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -106,6 +132,21 @@ export default function Collection({ onClose, onSelectCard }: CollectionProps) {
               </select>
             </div>
             <div className="flex items-center gap-2">
+              <span className="text-gray-400 text-sm">Vzácnost:</span>
+              <select
+                value={filterRarity}
+                onChange={(e) => setFilterRarity(e.target.value)}
+                className="bg-[#1a1a2e] border border-[#3B4CCA] rounded-lg px-3 py-2 text-white text-sm"
+              >
+                <option value="all">Všechny</option>
+                {getUniqueRarities().map((rarity) => (
+                  <option key={rarity} value={rarity}>
+                    {translateRarity(rarity)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
               <span className="text-gray-400 text-sm">Řadit:</span>
               <select
                 value={sortBy}
@@ -135,18 +176,41 @@ export default function Collection({ onClose, onSelectCard }: CollectionProps) {
 
         {/* Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredAndSortedItems.map((item) => (
-            <div
-              key={item.id}
-              className="glass rounded-xl p-4 relative group"
-            >
-              {/* Delete Button */}
-              <button
-                onClick={() => removeCard(item.card.id)}
-                className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 rounded-full p-1.5 transition-colors opacity-0 group-hover:opacity-100 z-10"
+          {filteredAndSortedItems.map((item) => {
+            const rarityLevel = getRarityLevel(item.card.rarity);
+            const rarityClasses = {
+              common: "rarity-common",
+              uncommon: "rarity-uncommon",
+              rare: "rarity-rare",
+              ultra: "rarity-ultra",
+              secret: "rarity-secret",
+            };
+            return (
+              <div
+                key={item.id}
+                className={`glass rounded-xl p-4 relative group ${rarityClasses[rarityLevel]}`}
               >
-                <Trash2 className="w-4 h-4 text-white" />
-              </button>
+              {/* Action Buttons */}
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 z-10">
+                <button
+                  onClick={() => isFavorite(item.card.id) ? removeFavorite(item.card.id) : addFavorite(item.card)}
+                  className={`rounded-full p-1.5 transition-colors ${
+                    isFavorite(item.card.id)
+                      ? "bg-red-500 text-white"
+                      : "bg-pink-600/80 hover:bg-pink-600 text-white"
+                  }`}
+                  title={isFavorite(item.card.id) ? "Odebrat z oblíbených" : "Přidat do oblíbených"}
+                >
+                  <Heart className={`w-4 h-4 ${isFavorite(item.card.id) ? "fill-current" : ""}`} />
+                </button>
+                <button
+                  onClick={() => removeCard(item.card.id)}
+                  className="bg-red-500/80 hover:bg-red-500 rounded-full p-1.5 transition-colors"
+                  title="Odebrat ze sbírky"
+                >
+                  <Trash2 className="w-4 h-4 text-white" />
+                </button>
+              </div>
 
               {/* Card Image */}
               <div
@@ -179,7 +243,9 @@ export default function Collection({ onClose, onSelectCard }: CollectionProps) {
                 </div>
 
                 {item.card.rarity && (
-                  <div className="text-xs text-[#FFCB05]">
+                  <div className={`rarity-badge rarity-badge-${rarityLevel}`}>
+                    {rarityLevel === "secret" && <span className="mr-1">✨</span>}
+                    {rarityLevel === "ultra" && <span className="mr-1">⭐</span>}
                     {translateRarity(item.card.rarity)}
                   </div>
                 )}
@@ -242,7 +308,8 @@ export default function Collection({ onClose, onSelectCard }: CollectionProps) {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

@@ -8,45 +8,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chybí text" }, { status: 400 });
     }
 
-    const subscriptionKey = process.env.AZURE_SPEECH_KEY;
-    const region = process.env.AZURE_SPEECH_REGION || "westeurope";
+    const apiKey = process.env.OPENAI_API_KEY;
 
-    // Pokud není Azure klíč, použijeme fallback
-    if (!subscriptionKey) {
+    if (!apiKey) {
       return NextResponse.json(
-        { error: "Azure TTS není nakonfigurován", fallback: true },
+        { error: "OpenAI API není nakonfigurován", fallback: true },
         { status: 200 }
       );
     }
 
-    // SSML pro lepší kvalitu hlasu
-    const ssml = `
-<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">
-  <voice name="cs-CZ-VlastaNeural">
-    <prosody rate="-5%" pitch="+5%">
-      ${text}
-    </prosody>
-  </voice>
-</speak>`;
-
-    // Volání Azure TTS REST API
-    const response = await fetch(
-      `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
-      {
-        method: "POST",
-        headers: {
-          "Ocp-Apim-Subscription-Key": subscriptionKey,
-          "Content-Type": "application/ssml+xml",
-          "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3",
-        },
-        body: ssml,
-      }
-    );
+    // Použijeme OpenAI TTS - mnohem lepší kvalita hlasu
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "tts-1",
+        input: text,
+        voice: "nova", // nova je příjemný ženský hlas, nebo "alloy" pro neutrální
+        response_format: "mp3",
+        speed: 1.0,
+      }),
+    });
 
     if (!response.ok) {
-      console.error("Azure TTS error:", response.status, await response.text());
+      console.error("OpenAI TTS error:", response.status, await response.text());
       return NextResponse.json(
-        { error: "Chyba Azure TTS", fallback: true },
+        { error: "Chyba OpenAI TTS", fallback: true },
         { status: 200 }
       );
     }

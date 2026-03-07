@@ -10,8 +10,15 @@ export interface CollectionItem {
   quantity: number;
 }
 
+export interface FavoriteItem {
+  id: string;
+  card: PokemonCard;
+  addedAt: string;
+}
+
 interface CollectionState {
   items: CollectionItem[];
+  favorites: FavoriteItem[];
   addCard: (card: PokemonCard, notes?: string) => void;
   removeCard: (cardId: string) => void;
   updateQuantity: (cardId: string, quantity: number) => void;
@@ -19,12 +26,19 @@ interface CollectionState {
   isInCollection: (cardId: string) => boolean;
   getCard: (cardId: string) => CollectionItem | undefined;
   clearCollection: () => void;
+  addFavorite: (card: PokemonCard) => void;
+  removeFavorite: (cardId: string) => void;
+  isFavorite: (cardId: string) => boolean;
+  clearFavorites: () => void;
+  exportData: () => string;
+  importData: (jsonData: string) => boolean;
 }
 
 export const useCollectionStore = create<CollectionState>()(
   persist(
     (set, get) => ({
       items: [],
+      favorites: [],
 
       addCard: (card: PokemonCard, notes?: string) => {
         const existing = get().items.find((item) => item.card.id === card.id);
@@ -91,6 +105,63 @@ export const useCollectionStore = create<CollectionState>()(
 
       clearCollection: () => {
         set({ items: [] });
+      },
+
+      addFavorite: (card: PokemonCard) => {
+        const existing = get().favorites.find((item) => item.card.id === card.id);
+        if (!existing) {
+          set((state) => ({
+            favorites: [
+              ...state.favorites,
+              {
+                id: `fav-${card.id}-${Date.now()}`,
+                card,
+                addedAt: new Date().toISOString(),
+              },
+            ],
+          }));
+        }
+      },
+
+      removeFavorite: (cardId: string) => {
+        set((state) => ({
+          favorites: state.favorites.filter((item) => item.card.id !== cardId),
+        }));
+      },
+
+      isFavorite: (cardId: string) => {
+        return get().favorites.some((item) => item.card.id === cardId);
+      },
+
+      clearFavorites: () => {
+        set({ favorites: [] });
+      },
+
+      exportData: () => {
+        const state = get();
+        const exportObj = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          items: state.items,
+          favorites: state.favorites,
+        };
+        return JSON.stringify(exportObj, null, 2);
+      },
+
+      importData: (jsonData: string) => {
+        try {
+          const data = JSON.parse(jsonData);
+          if (data.items && Array.isArray(data.items)) {
+            set({
+              items: data.items,
+              favorites: data.favorites || [],
+            });
+            return true;
+          }
+          return false;
+        } catch {
+          return false;
+        }
       },
     }),
     {

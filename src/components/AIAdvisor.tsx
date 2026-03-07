@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { PokemonCard, typeTranslations, rarityTranslations } from "@/types/pokemon";
-import { Mic, MicOff, Volume2, VolumeX, Bot, X, Sparkles } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, Bot, X, Sparkles, Send } from "lucide-react";
 
 interface AIAdvisorProps {
   card: PokemonCard | null;
@@ -54,11 +54,13 @@ declare global {
 export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [transcript, setTranscript] = useState("");
+  const [inputText, setInputText] = useState("");
+  const [interimText, setInterimText] = useState("");
   const [response, setResponse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const finalTranscriptRef = useRef("");
 
   const getImageUrl = (cardData: PokemonCard) => {
     if (cardData.image) {
@@ -73,15 +75,33 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
       const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognitionConstructor) {
         recognitionRef.current = new SpeechRecognitionConstructor();
-        recognitionRef.current.continuous = false;
+        recognitionRef.current.continuous = true;
         recognitionRef.current.interimResults = true;
         recognitionRef.current.lang = "cs-CZ";
 
         recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-          const result = event.results[event.results.length - 1];
-          const transcriptText = result[0].transcript;
-          setTranscript(transcriptText);
-          // Nečekáme na isFinal - uživatel musí potvrdit Enterem
+          let interimTranscript = "";
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript.trim();
+            if (event.results[i].isFinal) {
+              // Přidáme finální text do ref a input
+              const newFinal = finalTranscriptRef.current
+                ? finalTranscriptRef.current + " " + transcript
+                : transcript;
+              finalTranscriptRef.current = newFinal;
+              setInputText(newFinal);
+              setInterimText("");
+            } else {
+              // Interim text jen zobrazíme, nepřidáváme ho permanentně
+              interimTranscript += transcript;
+            }
+          }
+
+          // Zobrazíme interim text odděleně
+          if (interimTranscript) {
+            setInterimText(interimTranscript);
+          }
         };
 
         recognitionRef.current.onerror = () => {
@@ -92,17 +112,14 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
           setIsListening(false);
         };
       }
-
-      // Inicializace Speech Synthesis
-      synthRef.current = window.speechSynthesis;
     }
 
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      if (synthRef.current) {
-        synthRef.current.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
     };
   }, []);
@@ -116,15 +133,39 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      setInterimText("");
     } else {
-      setTranscript("");
+      // Reset pro nové nahrávání
+      finalTranscriptRef.current = inputText;
+      setInterimText("");
       recognitionRef.current.start();
       setIsListening(true);
     }
   };
 
+  // Fallback na browserový TTS
+  const speakWithBrowserTTS = (text: string) => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "cs-CZ";
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setIsSpeaking(false);
+    }
+  };
+
+  // Přehrát odpověď pomocí OpenAI TTS
   const speak = async (text: string) => {
-    // Nejprve zkusíme Azure TTS
     try {
       setIsSpeaking(true);
 
@@ -134,61 +175,50 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
         body: JSON.stringify({ text }),
       });
 
-      // Pokud máme audio odpověď (ne JSON s fallback)
       const contentType = response.headers.get("content-type");
+
       if (contentType?.includes("audio")) {
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
 
-        audio.onended = () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+
+        audioRef.current = new Audio(audioUrl);
+        audioRef.current.onended = () => {
           setIsSpeaking(false);
           URL.revokeObjectURL(audioUrl);
         };
-        audio.onerror = () => {
+        audioRef.current.onerror = () => {
           setIsSpeaking(false);
           URL.revokeObjectURL(audioUrl);
-          // Fallback na browser TTS
-          speakWithBrowser(text);
+          // Fallback na browserový TTS při chybě přehrávání
+          speakWithBrowserTTS(text);
         };
 
-        await audio.play();
-        return;
+        await audioRef.current.play();
+      } else {
+        // Fallback na browserový TTS když OpenAI není k dispozici
+        speakWithBrowserTTS(text);
       }
-
-      // Fallback na browser TTS
-      speakWithBrowser(text);
     } catch (error) {
       console.error("TTS error:", error);
-      speakWithBrowser(text);
+      // Fallback na browserový TTS při chybě
+      speakWithBrowserTTS(text);
     }
-  };
-
-  // Fallback funkce pro browser TTS
-  const speakWithBrowser = (text: string) => {
-    if (!synthRef.current) {
-      setIsSpeaking(false);
-      return;
-    }
-
-    synthRef.current.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "cs-CZ";
-    utterance.rate = 0.9;
-    utterance.pitch = 1.1;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    synthRef.current.speak(utterance);
   };
 
   const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      setIsSpeaking(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
+    // Zastavit i browserový TTS
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
   };
 
   const translateType = (type: string) => typeTranslations[type] || type;
@@ -237,56 +267,71 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
     return parts.join(" ");
   };
 
-  const handleQuestion = async (question: string) => {
-    setIsLoading(true);
-    const lowerQuestion = question.toLowerCase();
+  // Odeslat otázku - volá se POUZE při kliknutí na tlačítko nebo Enter
+  const handleSubmit = async () => {
+    if (!inputText.trim() || !card) return;
 
+    // Zastavit nahrávání pokud běží
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+
+    setIsLoading(true);
+    setInterimText("");
+    finalTranscriptRef.current = "";
+    const question = inputText.toLowerCase();
     let answer = "";
 
-    // Odpovědi na různé otázky
-    if (card) {
-      if (lowerQuestion.includes("řekni") || lowerQuestion.includes("popiš") || lowerQuestion.includes("vysvětli") || lowerQuestion.includes("kdo je") || lowerQuestion.includes("co je")) {
-        answer = generateCardExplanation(card);
-      } else if (lowerQuestion.includes("útok") || lowerQuestion.includes("útoky")) {
-        if (card.attacks && card.attacks.length > 0) {
-          answer = `${card.name} má tyto útoky: ${card.attacks.map(a => `${a.name}${a.damage ? ` za ${a.damage} poškození` : ""}`).join(", ")}.`;
-        } else {
-          answer = `${card.name} nemá žádné útoky. To je asi trenérská nebo energetická karta.`;
-        }
-      } else if (lowerQuestion.includes("život") || lowerQuestion.includes("hp")) {
-        answer = card.hp ? `${card.name} má ${card.hp} životů.` : `${card.name} nemá žádné životy. To je asi trenérská nebo energetická karta.`;
-      } else if (lowerQuestion.includes("typ")) {
-        if (card.types && card.types.length > 0) {
-          answer = `${card.name} je ${card.types.map(translateType).join(" a ")} typu.`;
-        } else {
-          answer = `${card.name} nemá specifický typ.`;
-        }
-      } else if (lowerQuestion.includes("slabost") || lowerQuestion.includes("slabý")) {
-        if (card.weaknesses && card.weaknesses.length > 0) {
-          answer = `${card.name} je slabý na ${card.weaknesses.map(w => translateType(w.type)).join(" a ")} typ. To znamená, že takové útoky na něj působí ${card.weaknesses[0].value} silněji!`;
-        } else {
-          answer = `${card.name} nemá žádnou slabost. To je super!`;
-        }
-      } else if (lowerQuestion.includes("vzácn") || lowerQuestion.includes("rarity")) {
-        answer = card.rarity
-          ? `${card.name} má vzácnost ${translateRarity(card.rarity)}. ${card.rarity.toLowerCase().includes("rare") ? "To je celkem vzácná karta!" : ""}`
-          : `Nevím, jakou vzácnost má ${card.name}.`;
-      } else if (lowerQuestion.includes("schopnost") || lowerQuestion.includes("ability")) {
-        if (card.abilities && card.abilities.length > 0) {
-          answer = `${card.name} má schopnost ${card.abilities[0].name}: ${card.abilities[0].effect}`;
-        } else {
-          answer = `${card.name} nemá žádnou speciální schopnost.`;
-        }
+    if (question.includes("řekni") || question.includes("popiš") || question.includes("vysvětli") || question.includes("kdo je") || question.includes("co je")) {
+      answer = generateCardExplanation(card);
+    } else if (question.includes("útok") || question.includes("útoky")) {
+      if (card.attacks && card.attacks.length > 0) {
+        answer = `${card.name} má tyto útoky: ${card.attacks.map(a => `${a.name}${a.damage ? ` za ${a.damage} poškození` : ""}`).join(", ")}.`;
       } else {
-        answer = generateCardExplanation(card);
+        answer = `${card.name} nemá žádné útoky. To je asi trenérská nebo energetická karta.`;
+      }
+    } else if (question.includes("život") || question.includes("hp")) {
+      answer = card.hp ? `${card.name} má ${card.hp} životů.` : `${card.name} nemá žádné životy. To je asi trenérská nebo energetická karta.`;
+    } else if (question.includes("typ")) {
+      if (card.types && card.types.length > 0) {
+        answer = `${card.name} je ${card.types.map(translateType).join(" a ")} typu.`;
+      } else {
+        answer = `${card.name} nemá specifický typ.`;
+      }
+    } else if (question.includes("slabost") || question.includes("slabý")) {
+      if (card.weaknesses && card.weaknesses.length > 0) {
+        answer = `${card.name} je slabý na ${card.weaknesses.map(w => translateType(w.type)).join(" a ")} typ. To znamená, že takové útoky na něj působí ${card.weaknesses[0].value} silněji!`;
+      } else {
+        answer = `${card.name} nemá žádnou slabost. To je super!`;
+      }
+    } else if (question.includes("vzácn") || question.includes("rarity")) {
+      answer = card.rarity
+        ? `${card.name} má vzácnost ${translateRarity(card.rarity)}. ${card.rarity.toLowerCase().includes("rare") ? "To je celkem vzácná karta!" : ""}`
+        : `Nevím, jakou vzácnost má ${card.name}.`;
+    } else if (question.includes("schopnost") || question.includes("ability")) {
+      if (card.abilities && card.abilities.length > 0) {
+        answer = `${card.name} má schopnost ${card.abilities[0].name}: ${card.abilities[0].effect}`;
+      } else {
+        answer = `${card.name} nemá žádnou speciální schopnost.`;
       }
     } else {
-      answer = "Nejdříve vyber nějakou kartu, abych ti o ní mohl něco říct!";
+      answer = generateCardExplanation(card);
     }
 
     setResponse(answer);
+    setInputText("");
     setIsLoading(false);
+
+    // Přehrát odpověď
     speak(answer);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   const quickQuestions = [
@@ -327,7 +372,7 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
             />
             <div>
               <h3 className="text-xl font-bold text-white">{card.name}</h3>
-              <p className="text-gray-400">Ptej se mě na tuhle kartu!</p>
+              <p className="text-gray-400">Napiš otázku nebo mluv a stiskni Enter</p>
             </div>
           </div>
         ) : (
@@ -350,10 +395,13 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
                 <button
                   key={question}
                   onClick={() => {
-                    setTranscript(question);
-                    handleQuestion(question);
+                    setInputText(question);
+                    finalTranscriptRef.current = question;
+                    setInterimText("");
+                    setTimeout(() => handleSubmit(), 100);
                   }}
-                  className="px-3 py-1.5 bg-[#3B4CCA]/40 hover:bg-[#3B4CCA]/60 rounded-full text-sm text-white transition-colors"
+                  disabled={isLoading}
+                  className="px-3 py-1.5 bg-[#3B4CCA]/40 hover:bg-[#3B4CCA]/60 rounded-full text-sm text-white transition-colors disabled:opacity-50"
                 >
                   {question}
                 </button>
@@ -362,110 +410,62 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
           </div>
         )}
 
-        {/* Voice Controls */}
-        <div className="flex justify-center gap-4 mb-6">
-          <button
-            onClick={toggleListening}
-            disabled={!card}
-            className={`p-4 rounded-full transition-all ${
-              isListening
-                ? "bg-red-500 animate-pulse"
-                : card
-                ? "bg-[#3B4CCA] hover:bg-[#4a5bd9]"
-                : "bg-gray-600 cursor-not-allowed"
-            }`}
-          >
-            {isListening ? (
-              <MicOff className="w-8 h-8 text-white" />
-            ) : (
-              <Mic className="w-8 h-8 text-white" />
-            )}
-          </button>
-
-          <button
-            onClick={isSpeaking ? stopSpeaking : () => response && speak(response)}
-            disabled={!response}
-            className={`p-4 rounded-full transition-all ${
-              isSpeaking
-                ? "bg-[#FFCB05] animate-pulse"
-                : response
-                ? "bg-[#3B4CCA] hover:bg-[#4a5bd9]"
-                : "bg-gray-600 cursor-not-allowed"
-            }`}
-          >
-            {isSpeaking ? (
-              <VolumeX className="w-8 h-8 text-black" />
-            ) : (
-              <Volume2 className="w-8 h-8 text-white" />
-            )}
-          </button>
-        </div>
-
-        {/* Listening Indicator */}
-        {isListening && (
-          <div className="text-center mb-4">
-            <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-400 px-4 py-2 rounded-full">
-              <span className="animate-pulse">●</span>
-              Poslouchám... (mluv a pak stiskni Enter)
-            </div>
-          </div>
-        )}
-
-        {/* Text input když není transcript */}
-        {!transcript && card && !isListening && (
-          <div className="mb-4 bg-[#1a1a2e] rounded-xl p-4">
-            <h4 className="text-sm font-semibold text-gray-400 mb-2">
-              Nebo napiš svou otázku:
-            </h4>
+        {/* Input Area */}
+        {card && (
+          <div className="mb-6">
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && e.currentTarget.value.trim() && !isLoading) {
-                    setTranscript(e.currentTarget.value);
-                    handleQuestion(e.currentTarget.value);
-                  }
-                }}
-                className="flex-1 bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-lg px-4 py-2 text-white focus:border-[#FFCB05] focus:outline-none"
-                placeholder="Napiš otázku a stiskni Enter..."
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-        )}
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={interimText ? `${inputText} ${interimText}`.trim() : inputText}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    finalTranscriptRef.current = e.target.value;
+                    setInterimText("");
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Napiš svou otázku..."
+                  disabled={isLoading}
+                  className="w-full bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-xl px-4 py-3 text-white focus:border-[#FFCB05] focus:outline-none disabled:opacity-50"
+                />
+                {isListening && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <span className="animate-pulse text-red-500">●</span>
+                    <span className="text-xs text-gray-400">Nahrávám...</span>
+                  </div>
+                )}
+              </div>
 
-        {/* Transcript s možností úpravy a potvrzení */}
-        {transcript && (
-          <div className="mb-4 bg-[#1a1a2e] rounded-xl p-4">
-            <h4 className="text-sm font-semibold text-gray-400 mb-2">
-              Tvoje otázka (uprav a stiskni Enter pro odeslání):
-            </h4>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && transcript.trim() && !isLoading) {
-                    handleQuestion(transcript);
-                  }
-                }}
-                className="flex-1 bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-lg px-4 py-2 text-white focus:border-[#FFCB05] focus:outline-none"
-                placeholder="Napiš nebo řekni svou otázku..."
-                disabled={isLoading}
-              />
+              {/* Mikrofon */}
               <button
-                onClick={() => handleQuestion(transcript)}
-                disabled={!transcript.trim() || isLoading}
-                className="pokemon-btn-yellow pokemon-btn px-4 py-2 disabled:opacity-50"
+                onClick={toggleListening}
+                disabled={isLoading}
+                className={`p-3 rounded-xl transition-all ${
+                  isListening
+                    ? "bg-red-500 animate-pulse"
+                    : "bg-[#3B4CCA] hover:bg-[#4a5bd9]"
+                } disabled:opacity-50`}
+                title={isListening ? "Zastavit nahrávání" : "Nahrát hlas"}
               >
-                {isLoading ? "..." : "Odeslat"}
+                {isListening ? (
+                  <MicOff className="w-6 h-6 text-white" />
+                ) : (
+                  <Mic className="w-6 h-6 text-white" />
+                )}
+              </button>
+
+              {/* Odeslat */}
+              <button
+                onClick={handleSubmit}
+                disabled={!inputText.trim() || isLoading}
+                className="p-3 rounded-xl bg-[#FFCB05] hover:bg-[#FFD700] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Odeslat (Enter)"
+              >
+                <Send className="w-6 h-6 text-black" />
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Stiskni Enter pro odeslání otázky
+              {isListening ? "Mluv... Až domluvíš, stiskni Enter pro odeslání" : "Stiskni Enter pro odeslání nebo klikni na mikrofon pro hlasový vstup"}
             </p>
           </div>
         )}
@@ -480,18 +480,34 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
         {/* Response */}
         {response && !isLoading && (
           <div className="bg-gradient-to-br from-[#3B4CCA]/30 to-[#FFCB05]/10 rounded-xl p-4">
-            <h4 className="text-sm font-semibold text-[#FFCB05] mb-2 flex items-center gap-2">
-              <Bot className="w-4 h-4" />
-              Odpověď:
-            </h4>
+            <div className="flex justify-between items-start mb-2">
+              <h4 className="text-sm font-semibold text-[#FFCB05] flex items-center gap-2">
+                <Bot className="w-4 h-4" />
+                Odpověď:
+              </h4>
+              <button
+                onClick={() => isSpeaking ? stopSpeaking() : speak(response)}
+                className={`p-2 rounded-full transition-all ${
+                  isSpeaking
+                    ? "bg-[#FFCB05] animate-pulse"
+                    : "bg-[#3B4CCA] hover:bg-[#4a5bd9]"
+                }`}
+                title={isSpeaking ? "Zastavit" : "Přehrát"}
+              >
+                {isSpeaking ? (
+                  <VolumeX className="w-5 h-5 text-black" />
+                ) : (
+                  <Volume2 className="w-5 h-5 text-white" />
+                )}
+              </button>
+            </div>
             <p className="text-white leading-relaxed">{response}</p>
           </div>
         )}
 
         {/* Help Text */}
         <div className="mt-6 text-center text-gray-500 text-sm">
-          <p>Klikni na mikrofon a zeptej se česky!</p>
-          <p className="mt-1">Nebo použij rychlé otázky výše.</p>
+          <p>Napiš otázku a stiskni Enter, nebo použij mikrofon</p>
         </div>
       </div>
     </div>
