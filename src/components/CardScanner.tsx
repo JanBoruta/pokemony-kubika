@@ -82,61 +82,19 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
     }
   };
 
-  // Upload HEIC do Cloudinary a získání JPEG URL
-  const uploadToCloudinary = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await fetch("/api/upload-image", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Upload do Cloudinary selhal");
-    }
-
-    return data.jpg_url;
-  };
-
   const processCard = async (card: ScannedCard) => {
     console.log("[CardScanner] Processing card:", card.file.name, "Type:", card.file.type, "Size:", card.file.size);
 
     try {
-      const isHeic = card.file.type === "image/heic" ||
-                     card.file.type === "image/heif" ||
-                     card.file.name.toLowerCase().endsWith(".heic") ||
-                     card.file.name.toLowerCase().endsWith(".heif");
+      // Nahrávání - server zvládne HEIC konverzi
+      console.log("[CardScanner] Converting to base64...");
+      updateCard(card.id, { status: "uploading", statusText: "Nahrávám fotku..." });
 
-      let apiPayload: { image?: string; imageUrl?: string };
+      const base64 = await fileToBase64(card.file);
+      console.log("[CardScanner] Base64 length:", base64.length);
 
-      // Pro HEIC použijeme Cloudinary pro konverzi
-      if (isHeic) {
-        console.log("[CardScanner] HEIC detected, uploading to Cloudinary...");
-        updateCard(card.id, { status: "converting", statusText: "Nahrávám HEIC do cloudu..." });
-
-        const jpgUrl = await uploadToCloudinary(card.file);
-        console.log("[CardScanner] Cloudinary upload successful:", jpgUrl);
-
-        // Nastav náhled z Cloudinary URL
-        updateCard(card.id, { previewUrl: jpgUrl });
-
-        apiPayload = { imageUrl: jpgUrl };
-      } else {
-        // Pro ostatní formáty použijeme base64
-        console.log("[CardScanner] Converting to base64...");
-        updateCard(card.id, { status: "uploading", statusText: "Nahrávám fotku..." });
-
-        const base64 = await fileToBase64(card.file);
-        console.log("[CardScanner] Base64 length:", base64.length);
-
-        if (!base64 || !base64.startsWith("data:image/")) {
-          throw new Error("Nepodařilo se převést obrázek na base64");
-        }
-
-        apiPayload = { image: base64 };
+      if (!base64 || !base64.startsWith("data:")) {
+        throw new Error("Nepodařilo se převést obrázek na base64");
       }
 
       // AI analýza
@@ -146,7 +104,7 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
       const response = await fetch("/api/scan-card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(apiPayload),
+        body: JSON.stringify({ image: base64 }),
       });
 
       console.log("[CardScanner] API response status:", response.status);
