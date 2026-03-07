@@ -90,34 +90,33 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
       let previewUrl = card.previewUrl;
       const isHeic = card.file.type === "image/heic" || card.file.name.toLowerCase().endsWith(".heic");
 
-      // Pro HEIC zkusíme konverzi pro náhled, ale pokud selže, pokračujeme bez náhledu
+      // Pro HEIC MUSÍME konvertovat na klientovi - server to nezvládne
       if (isHeic) {
-        console.log("[CardScanner] HEIC detected, trying to convert for preview...");
-        updateCard(card.id, { status: "converting", statusText: "Zpracovávám HEIC..." });
+        console.log("[CardScanner] HEIC detected, converting to JPEG...");
+        updateCard(card.id, { status: "converting", statusText: "Konvertuji HEIC na JPEG..." });
 
         try {
           const heic2any = (await import("heic2any")).default;
           const convertedBlob = await heic2any({
             blob: card.file,
             toType: "image/jpeg",
-            quality: 0.8,
+            quality: 0.85,
           });
+
+          // heic2any může vrátit pole nebo jeden blob
+          const resultBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+
           processedFile = new File(
-            [convertedBlob as Blob],
+            [resultBlob],
             card.file.name.replace(/\.heic$/i, ".jpg"),
             { type: "image/jpeg" }
           );
           previewUrl = URL.createObjectURL(processedFile);
           updateCard(card.id, { previewUrl });
-          console.log("[CardScanner] HEIC conversion successful");
+          console.log("[CardScanner] HEIC conversion successful, new size:", processedFile.size);
         } catch (heicError) {
-          // Konverze selhala, ale můžeme pokračovat - GPT-4 Vision zvládne HEIC
-          console.warn("[CardScanner] HEIC conversion failed, continuing with original:", heicError);
-          // Nastavíme alespoň prázdný náhled a pokračujeme
-          updateCard(card.id, {
-            previewUrl: "",
-            statusText: "HEIC náhled nedostupný, zpracovávám..."
-          });
+          console.error("[CardScanner] HEIC conversion failed:", heicError);
+          throw new Error("Nepodařilo se zpracovat HEIC soubor. Zkus fotku převést na JPEG před nahráním.");
         }
       }
 

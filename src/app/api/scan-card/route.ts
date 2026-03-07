@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import convert from "heic-convert";
 
 interface ScanResult {
   name: string;
@@ -28,14 +27,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chybí obrázek" }, { status: 400 });
     }
 
-    // Validuj base64 formát - povolíme různé formáty včetně HEIC a application/octet-stream
-    const validPrefixes = ["data:image/", "data:application/octet-stream"];
-    const hasValidPrefix = validPrefixes.some(prefix => image.startsWith(prefix));
-
-    if (!hasValidPrefix) {
+    // Validuj base64 formát
+    if (!image.startsWith("data:image/")) {
       console.log("[scan-card] Invalid image format, starts with:", image.substring(0, 50));
       return NextResponse.json(
-        { error: "Neplatný formát obrázku. Očekává se base64 data URL." },
+        { error: "Neplatný formát obrázku. Očekává se JPEG nebo PNG." },
         { status: 400 }
       );
     }
@@ -52,8 +48,8 @@ export async function POST(req: NextRequest) {
 
     console.log("[scan-card] Image size:", Math.round(image.length / 1024), "KB");
 
-    // Extrahuj base64 data a MIME type
-    const matches = image.match(/^data:([^;]+);base64,(.+)$/);
+    // Extrahuj MIME type
+    const matches = image.match(/^data:([^;]+);base64,/);
     if (!matches) {
       return NextResponse.json(
         { error: "Neplatný formát base64 obrázku" },
@@ -61,37 +57,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let mimeType = matches[1];
-    let base64Data = matches[2];
-    let finalImageUrl = image;
+    const mimeType = matches[1].toLowerCase();
+    console.log("[scan-card] MIME type:", mimeType);
 
-    // Pokud je to HEIC nebo neznámý formát, konvertuj na JPEG
+    // Zkontroluj podporované formáty (OpenAI Vision)
     const supportedFormats = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"];
-    if (!supportedFormats.includes(mimeType.toLowerCase())) {
-      console.log("[scan-card] Converting from", mimeType, "to JPEG...");
-      try {
-        const inputBuffer = Buffer.from(base64Data, "base64");
-        // Convert Buffer to ArrayBuffer for heic-convert
-        const arrayBuffer = inputBuffer.buffer.slice(
-          inputBuffer.byteOffset,
-          inputBuffer.byteOffset + inputBuffer.byteLength
-        );
-        const jpegBuffer = await convert({
-          buffer: arrayBuffer,
-          format: "JPEG",
-          quality: 0.85
-        });
-        base64Data = Buffer.from(jpegBuffer).toString("base64");
-        mimeType = "image/jpeg";
-        finalImageUrl = `data:image/jpeg;base64,${base64Data}`;
-        console.log("[scan-card] Conversion successful, new size:", Math.round(jpegBuffer.byteLength / 1024), "KB");
-      } catch (conversionError) {
-        console.error("[scan-card] Conversion error:", conversionError);
-        return NextResponse.json(
-          { error: "Nepodařilo se konvertovat obrázek. Zkus použít JPEG nebo PNG." },
-          { status: 400 }
-        );
-      }
+    if (!supportedFormats.includes(mimeType)) {
+      console.log("[scan-card] Unsupported format:", mimeType);
+      return NextResponse.json(
+        { error: `Nepodporovaný formát (${mimeType}). Použij JPEG, PNG, GIF nebo WebP.` },
+        { status: 400 }
+      );
     }
 
     // Použij GPT-4 Vision pro rozpoznání karty
@@ -133,7 +109,7 @@ Příklad správné odpovědi: {"name":"Pikachu","set":"Scarlet & Violet","numbe
               {
                 type: "image_url",
                 image_url: {
-                  url: finalImageUrl,
+                  url: image,
                   detail: "high"
                 }
               }
