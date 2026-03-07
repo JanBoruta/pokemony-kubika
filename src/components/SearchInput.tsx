@@ -27,7 +27,7 @@ export default function SearchInput({
       if (query.length >= 2) {
         setIsLoading(true);
         try {
-          const data = await searchCards(query, 1, 5);
+          const data = await searchCards(query, 1, 15);
           setResults(data.data || []);
           setShowDropdown(true);
         } catch (error) {
@@ -131,38 +131,54 @@ export default function SearchInput({
       {showDropdown && results.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-2 autocomplete-dropdown"
+          className="absolute z-50 w-full mt-2 autocomplete-dropdown max-h-[500px] overflow-y-auto"
         >
+          <div className="sticky top-0 bg-[#1E293B] px-4 py-2 text-xs text-gray-400 border-b border-red-500/30">
+            Nalezeno {results.length} výsledků • Scrolluj pro více
+          </div>
           {results.map((card, index) => (
             <div
               key={card.id}
               onClick={() => handleSelectCard(card)}
-              className={`autocomplete-item flex items-center gap-4 ${
+              className={`autocomplete-item flex items-center gap-4 p-3 ${
                 index === selectedIndex ? "bg-[#3B4CCA]/50" : ""
               }`}
             >
               <img
                 src={getImageUrl(card)}
                 alt={card.name}
-                className="w-12 h-16 object-contain rounded"
+                className="w-24 h-32 object-contain rounded-lg shadow-lg border border-white/10"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/placeholder-card.png";
                 }}
               />
-              <div className="flex-1">
-                <div className="font-semibold text-white">{card.name}</div>
-                <div className="text-sm text-gray-400 flex items-center gap-2">
-                  <span>{typeTranslations[card.category] || card.category}</span>
-                  {card.hp && <span>• {card.hp} HP</span>}
-                  {card.types && card.types[0] && (
-                    <span className={`type-badge type-${card.types[0]?.toLowerCase()}`}>
-                      {typeTranslations[card.types[0]] || card.types[0]}
-                    </span>
-                  )}
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-white text-lg">{card.name}</div>
+                <div className="text-sm text-gray-400 flex flex-wrap items-center gap-2 mt-1">
+                  <span className="text-[#FFCB05]">{typeTranslations[card.category] || card.category}</span>
+                  {card.hp && <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-bold">{card.hp} HP</span>}
                 </div>
+                {card.types && card.types.length > 0 && (
+                  <div className="flex gap-1 mt-2">
+                    {card.types.map((type) => (
+                      <span key={type} className={`type-badge type-${type.toLowerCase()} text-xs`}>
+                        {typeTranslations[type] || type}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {card.set && (
+                  <div className="text-xs text-gray-500 mt-1 truncate">
+                    Set: {card.set.name}
+                  </div>
+                )}
               </div>
               {card.rarity && (
-                <span className="text-xs text-[#FFCB05]">{card.rarity}</span>
+                <div className="text-right">
+                  <span className="text-xs text-[#FFCB05] font-semibold bg-[#FFCB05]/10 px-2 py-1 rounded">
+                    {card.rarity}
+                  </span>
+                </div>
               )}
             </div>
           ))}

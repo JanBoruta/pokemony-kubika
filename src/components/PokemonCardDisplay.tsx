@@ -120,7 +120,8 @@ export default function PokemonCardDisplay({
                       {attack.cost.map((cost, i) => (
                         <span
                           key={i}
-                          className={`w-5 h-5 rounded-full type-${cost.toLowerCase()} inline-flex items-center justify-center text-xs`}
+                          className={`energy-symbol energy-${cost.toLowerCase()}`}
+                          title={translateType(cost)}
                         />
                       ))}
                     </div>
@@ -166,7 +167,8 @@ export default function PokemonCardDisplay({
                   {Array.from({ length: card.retreat }).map((_, i) => (
                     <span
                       key={i}
-                      className="w-5 h-5 rounded-full type-colorless"
+                      className="energy-symbol energy-colorless"
+                      title="Bezbarvá energie"
                     />
                   ))}
                 </div>
