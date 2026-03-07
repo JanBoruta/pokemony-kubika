@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Search, X } from "lucide-react";
-import { PokemonCard } from "@/types/pokemon";
+import { PokemonCard, typeTranslations } from "@/types/pokemon";
 import { searchCards } from "@/lib/pokemon-api";
 
 interface SearchInputProps {
@@ -28,7 +28,7 @@ export default function SearchInput({
         setIsLoading(true);
         try {
           const data = await searchCards(query, 1, 5);
-          setResults(data.data);
+          setResults(data.data || []);
           setShowDropdown(true);
         } catch (error) {
           console.error("Search error:", error);
@@ -92,6 +92,13 @@ export default function SearchInput({
     inputRef.current?.focus();
   };
 
+  const getImageUrl = (card: PokemonCard) => {
+    if (card.image) {
+      return `${card.image}/low.webp`;
+    }
+    return "/placeholder-card.png";
+  };
+
   return (
     <div className="relative w-full max-w-2xl mx-auto">
       <div className="relative">
@@ -135,18 +142,21 @@ export default function SearchInput({
               }`}
             >
               <img
-                src={card.images.small}
+                src={getImageUrl(card)}
                 alt={card.name}
                 className="w-12 h-16 object-contain rounded"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/placeholder-card.png";
+                }}
               />
               <div className="flex-1">
                 <div className="font-semibold text-white">{card.name}</div>
                 <div className="text-sm text-gray-400 flex items-center gap-2">
-                  <span>{card.supertype}</span>
+                  <span>{typeTranslations[card.category] || card.category}</span>
                   {card.hp && <span>• {card.hp} HP</span>}
-                  {card.types && (
+                  {card.types && card.types[0] && (
                     <span className={`type-badge type-${card.types[0]?.toLowerCase()}`}>
-                      {card.types[0]}
+                      {typeTranslations[card.types[0]] || card.types[0]}
                     </span>
                   )}
                 </div>
@@ -161,7 +171,7 @@ export default function SearchInput({
 
       {showDropdown && query.length >= 2 && results.length === 0 && !isLoading && (
         <div className="absolute z-50 w-full mt-2 autocomplete-dropdown p-4 text-center text-gray-400">
-          Žádné výsledky pro "{query}"
+          Žádné výsledky pro &quot;{query}&quot;
         </div>
       )}
     </div>

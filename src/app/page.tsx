@@ -19,6 +19,7 @@ export default function Home() {
   const [showAIAdvisor, setShowAIAdvisor] = useState(false);
   const [featuredCards, setFeaturedCards] = useState<PokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const collectionItems = useCollectionStore((state) => state.items);
 
   useEffect(() => {
@@ -27,10 +28,12 @@ export default function Home() {
 
   const loadFeaturedCards = async () => {
     try {
+      setLoadError(null);
       const cards = await getRandomCards(6);
       setFeaturedCards(cards);
     } catch (error) {
       console.error("Error loading featured cards:", error);
+      setLoadError("Nepodařilo se načíst karty. Zkus to znovu.");
     } finally {
       setIsLoading(false);
     }
@@ -54,6 +57,13 @@ export default function Home() {
 
   const handleRemoveFromCompare = (cardId: string) => {
     setCompareCards(compareCards.filter((c) => c.id !== cardId));
+  };
+
+  const getImageUrl = (card: PokemonCard) => {
+    if (card.image) {
+      return `${card.image}/low.webp`;
+    }
+    return "/placeholder-card.png";
   };
 
   return (
@@ -132,6 +142,20 @@ export default function Home() {
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#FFCB05] border-t-transparent"></div>
             </div>
+          ) : loadError ? (
+            <div className="text-center py-12">
+              <p className="text-red-400 mb-4">{loadError}</p>
+              <button
+                onClick={loadFeaturedCards}
+                className="pokemon-btn"
+              >
+                Zkusit znovu
+              </button>
+            </div>
+          ) : featuredCards.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              Žádné karty k zobrazení. Zkus vyhledat pomocí pole výše.
+            </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {featuredCards.map((card) => (
@@ -141,9 +165,12 @@ export default function Home() {
                   className="pokemon-card cursor-pointer rounded-xl overflow-hidden bg-[#1a1a2e] border-2 border-transparent hover:border-[#FFCB05]"
                 >
                   <img
-                    src={card.images.small}
+                    src={getImageUrl(card)}
                     alt={card.name}
                     className="w-full"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/placeholder-card.png";
+                    }}
                   />
                   <div className="p-2">
                     <div className="text-white font-semibold text-sm truncate">
@@ -205,7 +232,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="py-8 px-4 mt-8 border-t border-white/10">
         <div className="container mx-auto text-center text-gray-500 text-sm">
-          <p>Data poskytuje Pokémon TCG API</p>
+          <p>Data poskytuje TCGdex API</p>
           <p className="mt-1">
             Pokémon a všechny související názvy jsou ochranné známky Nintendo,
             Creatures Inc. a GAME FREAK inc.

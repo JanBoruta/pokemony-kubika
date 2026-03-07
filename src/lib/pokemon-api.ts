@@ -1,116 +1,143 @@
-import { PokemonCard, SearchResult } from "@/types/pokemon";
+import { PokemonCard, PokemonCardBasic } from "@/types/pokemon";
 
-const API_BASE = "https://api.pokemontcg.io/v2";
-
-// Volitelně můžeš přidat API klíč pro vyšší limity
-const API_KEY = process.env.NEXT_PUBLIC_POKEMON_TCG_API_KEY || "";
-
-const headers: HeadersInit = {
-  "Content-Type": "application/json",
-};
-
-if (API_KEY) {
-  headers["X-Api-Key"] = API_KEY;
-}
+// TCGdex API - free, reliable Pokemon TCG API
+const API_BASE = "https://api.tcgdex.net/v2/en";
 
 export async function searchCards(
   query: string,
   page: number = 1,
   pageSize: number = 20
-): Promise<SearchResult> {
-  const searchQuery = encodeURIComponent(`name:${query}*`);
-  const url = `${API_BASE}/cards?q=${searchQuery}&page=${page}&pageSize=${pageSize}`;
+): Promise<{ data: PokemonCard[]; totalCount: number }> {
+  try {
+    // TCGdex search endpoint
+    const url = `${API_BASE}/cards?name=${encodeURIComponent(query)}`;
 
-  const response = await fetch(url, { headers });
+    const response = await fetch(url);
 
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+    if (!response.ok) {
+      console.error(`API Error: ${response.status}`);
+      return { data: [], totalCount: 0 };
+    }
+
+    const basicCards: PokemonCardBasic[] = await response.json();
+
+    if (!basicCards || basicCards.length === 0) {
+      return { data: [], totalCount: 0 };
+    }
+
+    // Limit results for autocomplete
+    const limitedCards = basicCards.slice(0, pageSize);
+
+    // Fetch full details for each card
+    const detailedCards = await Promise.all(
+      limitedCards.map(async (card) => {
+        try {
+          const detailResponse = await fetch(`${API_BASE}/cards/${card.id}`);
+          if (detailResponse.ok) {
+            return await detailResponse.json();
+          }
+          // Return basic card info if detail fetch fails
+          return {
+            ...card,
+            category: "Pokemon",
+            set: { id: "", name: "Unknown" },
+          };
+        } catch {
+          return {
+            ...card,
+            category: "Pokemon",
+            set: { id: "", name: "Unknown" },
+          };
+        }
+      })
+    );
+
+    return {
+      data: detailedCards as PokemonCard[],
+      totalCount: basicCards.length
+    };
+  } catch (error) {
+    console.error("Search error:", error);
+    return { data: [], totalCount: 0 };
   }
-
-  return response.json();
 }
 
-export async function searchCardsAdvanced(
-  query: string,
-  options?: {
-    types?: string[];
-    supertype?: string;
-    rarity?: string;
-    set?: string;
-  },
-  page: number = 1,
-  pageSize: number = 20
-): Promise<SearchResult> {
-  const queryParts: string[] = [];
+export async function getCardById(id: string): Promise<PokemonCard | null> {
+  try {
+    const url = `${API_BASE}/cards/${id}`;
+    const response = await fetch(url);
 
-  if (query) {
-    queryParts.push(`name:${query}*`);
+    if (!response.ok) {
+      console.error(`API Error: ${response.status}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Get card error:", error);
+    return null;
   }
-
-  if (options?.types?.length) {
-    queryParts.push(`types:${options.types.join(" OR types:")}`);
-  }
-
-  if (options?.supertype) {
-    queryParts.push(`supertype:${options.supertype}`);
-  }
-
-  if (options?.rarity) {
-    queryParts.push(`rarity:"${options.rarity}"`);
-  }
-
-  if (options?.set) {
-    queryParts.push(`set.id:${options.set}`);
-  }
-
-  const searchQuery = encodeURIComponent(queryParts.join(" "));
-  const url = `${API_BASE}/cards?q=${searchQuery}&page=${page}&pageSize=${pageSize}`;
-
-  const response = await fetch(url, { headers });
-
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
-  }
-
-  return response.json();
 }
 
-export async function getCardById(id: string): Promise<PokemonCard> {
-  const url = `${API_BASE}/cards/${id}`;
+export async function getRandomCards(count: number = 6): Promise<PokemonCard[]> {
+  try {
+    // Get cards from a popular set (Scarlet & Violet base)
+    const sets = ["sv03", "sv02", "sv01", "swsh12", "swsh11"];
+    const randomSet = sets[Math.floor(Math.random() * sets.length)];
 
-  const response = await fetch(url, { headers });
+    const url = `${API_BASE}/sets/${randomSet}`;
+    const response = await fetch(url);
 
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+    if (!response.ok) {
+      console.error(`API Error: ${response.status}`);
+      return [];
+    }
+
+    const setData = await response.json();
+
+    if (!setData.cards || setData.cards.length === 0) {
+      return [];
+    }
+
+    // Shuffle and pick random cards
+    const shuffled = [...setData.cards].sort(() => Math.random() - 0.5);
+    const selectedCards = shuffled.slice(0, count);
+
+    // Fetch full details for selected cards
+    const detailedCards = await Promise.all(
+      selectedCards.map(async (card: PokemonCardBasic) => {
+        try {
+          const detailResponse = await fetch(`${API_BASE}/cards/${card.id}`);
+          if (detailResponse.ok) {
+            return await detailResponse.json();
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return detailedCards.filter((card): card is PokemonCard => card !== null);
+  } catch (error) {
+    console.error("Get random cards error:", error);
+    return [];
   }
-
-  const data = await response.json();
-  return data.data;
 }
 
-export async function getRandomCards(count: number = 5): Promise<PokemonCard[]> {
-  // Získáme náhodné karty z populárních setů
-  const url = `${API_BASE}/cards?pageSize=${count}&orderBy=-set.releaseDate`;
+export async function getSets(): Promise<{ id: string; name: string }[]> {
+  try {
+    const url = `${API_BASE}/sets`;
+    const response = await fetch(url);
 
-  const response = await fetch(url, { headers });
+    if (!response.ok) {
+      console.error(`API Error: ${response.status}`);
+      return [];
+    }
 
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error("Get sets error:", error);
+    return [];
   }
-
-  const data: SearchResult = await response.json();
-  return data.data;
-}
-
-export async function getSets(): Promise<{ id: string; name: string; releaseDate: string }[]> {
-  const url = `${API_BASE}/sets?orderBy=-releaseDate`;
-
-  const response = await fetch(url, { headers });
-
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.data;
 }

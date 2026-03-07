@@ -1,28 +1,35 @@
+// TCGdex API types
+
+export interface PokemonCardBasic {
+  id: string;
+  localId: string;
+  name: string;
+  image?: string;
+}
+
 export interface PokemonCard {
   id: string;
+  localId: string;
   name: string;
-  supertype: string; // "Pokémon", "Trainer", "Energy"
-  subtypes?: string[];
-  hp?: string;
+  image?: string;
+  category: string; // "Pokemon", "Trainer", "Energy"
+  illustrator?: string;
+  rarity?: string;
+  hp?: number;
   types?: string[];
+  stage?: string;
   evolvesFrom?: string;
-  evolvesTo?: string[];
-  rules?: string[];
-  ancientTrait?: {
-    name: string;
-    text: string;
-  };
-  abilities?: {
-    name: string;
-    text: string;
-    type: string;
-  }[];
+  description?: string;
   attacks?: {
     name: string;
-    cost: string[];
-    convertedEnergyCost: number;
-    damage: string;
-    text: string;
+    cost?: string[];
+    damage?: number | string;
+    effect?: string;
+  }[];
+  abilities?: {
+    name: string;
+    effect: string;
+    type: string;
   }[];
   weaknesses?: {
     type: string;
@@ -32,72 +39,26 @@ export interface PokemonCard {
     type: string;
     value: string;
   }[];
-  retreatCost?: string[];
-  convertedRetreatCost?: number;
+  retreat?: number;
   set: {
     id: string;
     name: string;
-    series: string;
-    printedTotal: number;
-    total: number;
-    legalities: {
-      unlimited?: string;
-      standard?: string;
-      expanded?: string;
-    };
-    ptcgoCode?: string;
-    releaseDate: string;
-    updatedAt: string;
-    images: {
-      symbol: string;
-      logo: string;
+    logo?: string;
+    cardCount?: {
+      official: number;
+      total: number;
     };
   };
-  number: string;
-  artist?: string;
-  rarity?: string;
-  flavorText?: string;
-  nationalPokedexNumbers?: number[];
-  legalities: {
-    unlimited?: string;
-    standard?: string;
-    expanded?: string;
-  };
-  regulationMark?: string;
-  images: {
-    small: string;
-    large: string;
-  };
-  tcgplayer?: {
-    url: string;
-    updatedAt: string;
-    prices?: {
-      [key: string]: {
-        low?: number;
-        mid?: number;
-        high?: number;
-        market?: number;
-        directLow?: number;
-      };
-    };
+  dexId?: number[];
+  legal?: {
+    standard: boolean;
+    expanded: boolean;
   };
 }
 
 export interface SearchResult {
   data: PokemonCard[];
-  page: number;
-  pageSize: number;
-  count: number;
   totalCount: number;
-}
-
-export interface CollectionCard {
-  id: string;
-  user_id: string;
-  card_id: string;
-  card_data: PokemonCard;
-  obtained_at: string;
-  notes?: string;
 }
 
 // České překlady typů
@@ -113,7 +74,7 @@ export const typeTranslations: Record<string, string> = {
   "Fairy": "Víla",
   "Dragon": "Drak",
   "Colorless": "Bezbarvý",
-  "Pokémon": "Pokémon",
+  "Pokemon": "Pokémon",
   "Trainer": "Trenér",
   "Energy": "Energie",
 };
@@ -124,18 +85,22 @@ export const rarityTranslations: Record<string, string> = {
   "Uncommon": "Neobvyklá",
   "Rare": "Vzácná",
   "Rare Holo": "Vzácná Holo",
-  "Rare Holo EX": "Vzácná Holo EX",
-  "Rare Holo GX": "Vzácná Holo GX",
-  "Rare Holo V": "Vzácná Holo V",
-  "Rare Holo VMAX": "Vzácná Holo VMAX",
-  "Rare Holo VSTAR": "Vzácná Holo VSTAR",
-  "Rare Ultra": "Ultra Vzácná",
-  "Rare Secret": "Tajná Vzácná",
+  "Ultra Rare": "Ultra Vzácná",
+  "Secret Rare": "Tajná Vzácná",
   "Promo": "Promo",
   "Amazing Rare": "Úžasná Vzácná",
-  "Rare Rainbow": "Duhová Vzácná",
   "Illustration Rare": "Ilustrační Vzácná",
   "Special Illustration Rare": "Speciální Ilustrační Vzácná",
   "Hyper Rare": "Hyper Vzácná",
   "Double Rare": "Dvojitě Vzácná",
+  "Shiny Rare": "Třpytivá Vzácná",
+  "None": "Žádná",
 };
+
+export interface CollectionCard {
+  id: string;
+  card_id: string;
+  card_data: PokemonCard;
+  obtained_at: string;
+  notes?: string;
+}

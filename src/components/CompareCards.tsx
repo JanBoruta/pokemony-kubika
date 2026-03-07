@@ -14,11 +14,18 @@ export default function CompareCards({ cards, onRemoveCard, onClose }: CompareCa
   const translateRarity = (rarity: string) => rarityTranslations[rarity] || rarity;
 
   const getMaxHP = () => {
-    const hps = cards.map((c) => parseInt(c.hp || "0"));
+    const hps = cards.map((c) => c.hp || 0);
     return Math.max(...hps);
   };
 
   const maxHP = getMaxHP();
+
+  const getImageUrl = (card: PokemonCard) => {
+    if (card.image) {
+      return `${card.image}/low.webp`;
+    }
+    return "/placeholder-card.png";
+  };
 
   if (cards.length === 0) {
     return null;
@@ -42,7 +49,7 @@ export default function CompareCards({ cards, onRemoveCard, onClose }: CompareCa
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {cards.map((card) => {
-            const hp = parseInt(card.hp || "0");
+            const hp = card.hp || 0;
             const isHighestHP = hp === maxHP && maxHP > 0;
 
             return (
@@ -66,9 +73,12 @@ export default function CompareCards({ cards, onRemoveCard, onClose }: CompareCa
                 )}
 
                 <img
-                  src={card.images.small}
+                  src={getImageUrl(card)}
                   alt={card.name}
                   className="w-full rounded-lg mb-4"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/placeholder-card.png";
+                  }}
                 />
 
                 <h3 className="text-xl font-bold text-white mb-2">{card.name}</h3>
@@ -101,10 +111,10 @@ export default function CompareCards({ cards, onRemoveCard, onClose }: CompareCa
                     </div>
                   </div>
 
-                  {/* Supertype */}
+                  {/* Category */}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Druh:</span>
-                    <span className="text-white">{translateType(card.supertype)}</span>
+                    <span className="text-white">{translateType(card.category)}</span>
                   </div>
 
                   {/* Attacks Count */}
@@ -120,8 +130,10 @@ export default function CompareCards({ cards, onRemoveCard, onClose }: CompareCa
                       {card.attacks
                         ? Math.max(
                             ...card.attacks.map((a) => {
-                              const match = a.damage.match(/\d+/);
-                              return match ? parseInt(match[0]) : 0;
+                              const damage = typeof a.damage === "number"
+                                ? a.damage
+                                : parseInt(String(a.damage)) || 0;
+                              return damage;
                             })
                           ) || "-"
                         : "-"}
@@ -146,7 +158,7 @@ export default function CompareCards({ cards, onRemoveCard, onClose }: CompareCa
                   {/* Retreat Cost */}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Cena ústupu:</span>
-                    <span className="text-white">{card.retreatCost?.length || 0}</span>
+                    <span className="text-white">{card.retreat || 0}</span>
                   </div>
 
                   {/* Rarity */}

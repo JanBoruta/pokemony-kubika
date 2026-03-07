@@ -60,6 +60,13 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
 
+  const getImageUrl = (cardData: PokemonCard) => {
+    if (cardData.image) {
+      return `${cardData.image}/low.webp`;
+    }
+    return "/placeholder-card.png";
+  };
+
   useEffect(() => {
     // Inicializace Speech Recognition
     if (typeof window !== "undefined") {
@@ -148,7 +155,7 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
   const generateCardExplanation = (cardData: PokemonCard): string => {
     const parts: string[] = [];
 
-    parts.push(`${cardData.name} je ${translateType(cardData.supertype).toLowerCase()}.`);
+    parts.push(`${cardData.name} je ${translateType(cardData.category).toLowerCase()}.`);
 
     if (cardData.hp) {
       parts.push(`Má ${cardData.hp} životů.`);
@@ -162,8 +169,8 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
     if (cardData.attacks && cardData.attacks.length > 0) {
       parts.push(`Umí ${cardData.attacks.length} ${cardData.attacks.length === 1 ? "útok" : cardData.attacks.length < 5 ? "útoky" : "útoků"}.`);
       const strongestAttack = cardData.attacks.reduce((max, attack) => {
-        const damage = parseInt(attack.damage) || 0;
-        const maxDamage = parseInt(max.damage) || 0;
+        const damage = typeof attack.damage === "number" ? attack.damage : parseInt(String(attack.damage)) || 0;
+        const maxDamage = typeof max.damage === "number" ? max.damage : parseInt(String(max.damage)) || 0;
         return damage > maxDamage ? attack : max;
       }, cardData.attacks[0]);
       if (strongestAttack.damage) {
@@ -220,11 +227,11 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
         }
       } else if (lowerQuestion.includes("vzácn") || lowerQuestion.includes("rarity")) {
         answer = card.rarity
-          ? `${card.name} má vzácnost ${translateRarity(card.rarity)}. ${card.rarity.includes("Rare") ? "To je celkem vzácná karta!" : ""}`
+          ? `${card.name} má vzácnost ${translateRarity(card.rarity)}. ${card.rarity.toLowerCase().includes("rare") ? "To je celkem vzácná karta!" : ""}`
           : `Nevím, jakou vzácnost má ${card.name}.`;
       } else if (lowerQuestion.includes("schopnost") || lowerQuestion.includes("ability")) {
         if (card.abilities && card.abilities.length > 0) {
-          answer = `${card.name} má schopnost ${card.abilities[0].name}: ${card.abilities[0].text}`;
+          answer = `${card.name} má schopnost ${card.abilities[0].name}: ${card.abilities[0].effect}`;
         } else {
           answer = `${card.name} nemá žádnou speciální schopnost.`;
         }
@@ -269,9 +276,12 @@ export default function AIAdvisor({ card, onClose }: AIAdvisorProps) {
         {card ? (
           <div className="flex items-center gap-4 mb-6 bg-[#3B4CCA]/20 rounded-xl p-4">
             <img
-              src={card.images.small}
+              src={getImageUrl(card)}
               alt={card.name}
               className="w-20 h-28 object-contain rounded"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/placeholder-card.png";
+              }}
             />
             <div>
               <h3 className="text-xl font-bold text-white">{card.name}</h3>

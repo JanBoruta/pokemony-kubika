@@ -25,10 +25,17 @@ export default function PokemonCardDisplay({
   const translateType = (type: string) => typeTranslations[type] || type;
   const translateRarity = (rarity: string) => rarityTranslations[rarity] || rarity;
 
-  const isRare = card.rarity?.includes("Rare") || card.rarity?.includes("Holo");
+  const isRare = card.rarity?.toLowerCase().includes("rare") || card.rarity?.toLowerCase().includes("holo");
+
+  const getImageUrl = () => {
+    if (card.image) {
+      return `${card.image}/high.webp`;
+    }
+    return "/placeholder-card.png";
+  };
 
   return (
-    <div className={`glass rounded-2xl p-6 ${isRare ? "glow-rare" : ""}`}>
+    <div className={`glass rounded-2xl p-6 relative ${isRare ? "glow-rare" : ""}`}>
       {onClose && (
         <button
           onClick={onClose}
@@ -42,9 +49,12 @@ export default function PokemonCardDisplay({
         {/* Obrázek karty */}
         <div className="flex-shrink-0">
           <img
-            src={card.images.large}
+            src={getImageUrl()}
             alt={card.name}
             className="w-full max-w-[300px] mx-auto rounded-xl shadow-2xl pokemon-card"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "/placeholder-card.png";
+            }}
           />
         </div>
 
@@ -54,7 +64,7 @@ export default function PokemonCardDisplay({
             <h2 className="text-3xl font-bold text-white mb-2">{card.name}</h2>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[#FFCB05] font-semibold">
-                {translateType(card.supertype)}
+                {translateType(card.category)}
               </span>
               {card.hp && (
                 <span className="text-white bg-red-500/80 px-3 py-1 rounded-full text-sm font-bold">
@@ -72,6 +82,14 @@ export default function PokemonCardDisplay({
             </div>
           </div>
 
+          {/* Stage / Evolution */}
+          {card.stage && (
+            <div className="text-gray-400 text-sm">
+              {card.stage}
+              {card.evolvesFrom && ` (vyvíjí se z ${card.evolvesFrom})`}
+            </div>
+          )}
+
           {/* Abilities */}
           {card.abilities && card.abilities.length > 0 && (
             <div className="space-y-2">
@@ -79,7 +97,7 @@ export default function PokemonCardDisplay({
               {card.abilities.map((ability, index) => (
                 <div key={index} className="bg-[#3B4CCA]/20 rounded-lg p-3">
                   <div className="font-semibold text-white">{ability.name}</div>
-                  <div className="text-sm text-gray-300">{ability.text}</div>
+                  <div className="text-sm text-gray-300">{ability.effect}</div>
                 </div>
               ))}
             </div>
@@ -97,16 +115,18 @@ export default function PokemonCardDisplay({
                       <div className="text-[#FFCB05] font-bold">{attack.damage}</div>
                     )}
                   </div>
-                  <div className="flex gap-1 mt-1">
-                    {attack.cost.map((cost, i) => (
-                      <span
-                        key={i}
-                        className={`w-5 h-5 rounded-full type-${cost.toLowerCase()} inline-flex items-center justify-center text-xs`}
-                      />
-                    ))}
-                  </div>
-                  {attack.text && (
-                    <div className="text-sm text-gray-300 mt-2">{attack.text}</div>
+                  {attack.cost && attack.cost.length > 0 && (
+                    <div className="flex gap-1 mt-1">
+                      {attack.cost.map((cost, i) => (
+                        <span
+                          key={i}
+                          className={`w-5 h-5 rounded-full type-${cost.toLowerCase()} inline-flex items-center justify-center text-xs`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {attack.effect && (
+                    <div className="text-sm text-gray-300 mt-2">{attack.effect}</div>
                   )}
                 </div>
               ))}
@@ -139,14 +159,14 @@ export default function PokemonCardDisplay({
                 </div>
               </div>
             )}
-            {card.retreatCost && (
+            {card.retreat !== undefined && card.retreat > 0 && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-400 mb-1">Ústup</h4>
                 <div className="flex gap-1">
-                  {card.retreatCost.map((cost, i) => (
+                  {Array.from({ length: card.retreat }).map((_, i) => (
                     <span
                       key={i}
-                      className={`w-5 h-5 rounded-full type-${cost.toLowerCase()}`}
+                      className="w-5 h-5 rounded-full type-colorless"
                     />
                   ))}
                 </div>
@@ -161,7 +181,8 @@ export default function PokemonCardDisplay({
                 <span className="font-semibold">Set:</span> {card.set.name}
               </div>
               <div>
-                <span className="font-semibold">Číslo:</span> {card.number}/{card.set.printedTotal}
+                <span className="font-semibold">Číslo:</span> {card.localId}
+                {card.set.cardCount && `/${card.set.cardCount.official}`}
               </div>
               {card.rarity && (
                 <div>
@@ -169,18 +190,18 @@ export default function PokemonCardDisplay({
                   <span className="text-[#FFCB05]">{translateRarity(card.rarity)}</span>
                 </div>
               )}
-              {card.artist && (
+              {card.illustrator && (
                 <div>
-                  <span className="font-semibold">Umělec:</span> {card.artist}
+                  <span className="font-semibold">Umělec:</span> {card.illustrator}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Flavor Text */}
-          {card.flavorText && (
+          {/* Description */}
+          {card.description && (
             <div className="italic text-gray-400 text-sm border-l-2 border-[#FFCB05] pl-4">
-              {card.flavorText}
+              {card.description}
             </div>
           )}
 

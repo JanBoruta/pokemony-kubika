@@ -58,6 +58,13 @@ export default function Collection({ onClose, onSelectCard }: CollectionProps) {
 
   const totalCards = items.reduce((sum, item) => sum + item.quantity, 0);
 
+  const getImageUrl = (card: PokemonCard) => {
+    if (card.image) {
+      return `${card.image}/low.webp`;
+    }
+    return "/placeholder-card.png";
+  };
+
   return (
     <div className="fixed inset-0 bg-black/90 z-50 overflow-auto">
       <div className="container mx-auto px-4 py-8">
@@ -147,9 +154,12 @@ export default function Collection({ onClose, onSelectCard }: CollectionProps) {
                 className="cursor-pointer"
               >
                 <img
-                  src={item.card.images.small}
+                  src={getImageUrl(item.card)}
                   alt={item.card.name}
                   className="w-full rounded-lg mb-3 pokemon-card"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/placeholder-card.png";
+                  }}
                 />
               </div>
 
