@@ -82,41 +82,97 @@ export default function CardScanner({ onClose, onCardFound }: CardScannerProps) 
     }
   };
 
+  // Konverze HEIC přes nativní canvas (funguje na Safari/iOS)
+  const convertViaCanvas = async (file: File): Promise<File> => {
+    const url = URL.createObjectURL(file);
+
+    try {
+      const img = new Image();
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Browser cannot decode this image"));
+        img.src = url;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas not supported");
+
+      ctx.drawImage(img, 0, 0);
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.9)
+      );
+
+      if (!blob) throw new Error("JPEG export failed");
+
+      return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), {
+        type: "image/jpeg",
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // Fallback konverze pomocí heic2any
+  const convertViaHeic2any = async (file: File): Promise<File> => {
+    const heic2any = (await import("heic2any")).default;
+
+    const result = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.85,
+    });
+
+    const convertedBlob = Array.isArray(result) ? result[0] : result;
+
+    return new File(
+      [convertedBlob as Blob],
+      file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+      { type: "image/jpeg" }
+    );
+  };
+
   const processCard = async (card: ScannedCard) => {
     console.log("[CardScanner] Processing card:", card.file.name, "Type:", card.file.type, "Size:", card.file.size);
 
     try {
       let processedFile = card.file;
       let previewUrl = card.previewUrl;
-      const isHeic = card.file.type === "image/heic" || card.file.name.toLowerCase().endsWith(".heic");
+      const isHeic = card.file.type === "image/heic" ||
+                     card.file.type === "image/heif" ||
+                     card.file.name.toLowerCase().endsWith(".heic") ||
+                     card.file.name.toLowerCase().endsWith(".heif");
 
-      // Pro HEIC MUSÍME konvertovat na klientovi - server to nezvládne
+      // Pro HEIC/HEIF konvertujeme na klientovi
       if (isHeic) {
         console.log("[CardScanner] HEIC detected, converting to JPEG...");
         updateCard(card.id, { status: "converting", statusText: "Konvertuji HEIC na JPEG..." });
 
+        // 1. Zkus nativní canvas (funguje na Safari/iOS)
         try {
-          const heic2any = (await import("heic2any")).default;
-          const convertedBlob = await heic2any({
-            blob: card.file,
-            toType: "image/jpeg",
-            quality: 0.85,
-          });
-
-          // heic2any může vrátit pole nebo jeden blob
-          const resultBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-
-          processedFile = new File(
-            [resultBlob],
-            card.file.name.replace(/\.heic$/i, ".jpg"),
-            { type: "image/jpeg" }
-          );
+          console.log("[CardScanner] Trying native canvas conversion...");
+          processedFile = await convertViaCanvas(card.file);
           previewUrl = URL.createObjectURL(processedFile);
           updateCard(card.id, { previewUrl });
-          console.log("[CardScanner] HEIC conversion successful, new size:", processedFile.size);
-        } catch (heicError) {
-          console.error("[CardScanner] HEIC conversion failed:", heicError);
-          throw new Error("Nepodařilo se zpracovat HEIC soubor. Zkus fotku převést na JPEG před nahráním.");
+          console.log("[CardScanner] Native canvas conversion successful, size:", processedFile.size);
+        } catch (canvasError) {
+          console.log("[CardScanner] Native canvas failed, trying heic2any...", canvasError);
+
+          // 2. Fallback na heic2any
+          try {
+            processedFile = await convertViaHeic2any(card.file);
+            previewUrl = URL.createObjectURL(processedFile);
+            updateCard(card.id, { previewUrl });
+            console.log("[CardScanner] heic2any conversion successful, size:", processedFile.size);
+          } catch (heicError) {
+            console.error("[CardScanner] Both conversion methods failed:", heicError);
+            throw new Error("Nepodařilo se zpracovat HEIC. Zkus fotku vyfotit znovu jako JPEG (v nastavení iPhone: Nastavení > Fotoaparát > Formáty > Nejkompatibilnější).");
+          }
         }
       }
 
