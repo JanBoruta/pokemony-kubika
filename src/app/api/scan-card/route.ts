@@ -71,15 +71,20 @@ export async function POST(req: NextRequest) {
       console.log("[scan-card] Converting from", mimeType, "to JPEG...");
       try {
         const inputBuffer = Buffer.from(base64Data, "base64");
+        // Convert Buffer to ArrayBuffer for heic-convert
+        const arrayBuffer = inputBuffer.buffer.slice(
+          inputBuffer.byteOffset,
+          inputBuffer.byteOffset + inputBuffer.byteLength
+        );
         const jpegBuffer = await convert({
-          buffer: inputBuffer,
+          buffer: arrayBuffer,
           format: "JPEG",
           quality: 0.85
         });
         base64Data = Buffer.from(jpegBuffer).toString("base64");
         mimeType = "image/jpeg";
         finalImageUrl = `data:image/jpeg;base64,${base64Data}`;
-        console.log("[scan-card] Conversion successful, new size:", Math.round(jpegBuffer.length / 1024), "KB");
+        console.log("[scan-card] Conversion successful, new size:", Math.round(jpegBuffer.byteLength / 1024), "KB");
       } catch (conversionError) {
         console.error("[scan-card] Conversion error:", conversionError);
         return NextResponse.json(
