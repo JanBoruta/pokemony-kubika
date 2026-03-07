@@ -2,18 +2,24 @@
 
 import { useState, useEffect } from "react";
 import { PokemonCard } from "@/types/pokemon";
-import { getRandomCards, searchCards } from "@/lib/pokemon-api";
+import { getRandomCards } from "@/lib/pokemon-api";
+import { useCollectionStore } from "@/store/collectionStore";
 import SearchInput from "@/components/SearchInput";
 import PokemonCardDisplay from "@/components/PokemonCardDisplay";
 import CompareCards from "@/components/CompareCards";
-import { Sparkles, ArrowLeftRight, BookOpen, X } from "lucide-react";
+import Collection from "@/components/Collection";
+import AIAdvisor from "@/components/AIAdvisor";
+import { Sparkles, ArrowLeftRight, BookOpen, Bot } from "lucide-react";
 
 export default function Home() {
   const [selectedCard, setSelectedCard] = useState<PokemonCard | null>(null);
   const [compareCards, setCompareCards] = useState<PokemonCard[]>([]);
   const [showCompare, setShowCompare] = useState(false);
+  const [showCollection, setShowCollection] = useState(false);
+  const [showAIAdvisor, setShowAIAdvisor] = useState(false);
   const [featuredCards, setFeaturedCards] = useState<PokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const collectionItems = useCollectionStore((state) => state.items);
 
   useEffect(() => {
     loadFeaturedCards();
@@ -84,9 +90,19 @@ export default function Home() {
             <ArrowLeftRight className="w-5 h-5" />
             Porovnat karty ({compareCards.length})
           </button>
-          <button className="pokemon-btn-yellow pokemon-btn flex items-center gap-2">
+          <button
+            onClick={() => setShowCollection(true)}
+            className="pokemon-btn-yellow pokemon-btn flex items-center gap-2"
+          >
             <BookOpen className="w-5 h-5" />
-            Moje sbírka
+            Moje sbírka ({collectionItems.length})
+          </button>
+          <button
+            onClick={() => setShowAIAdvisor(true)}
+            className="pokemon-btn-red pokemon-btn flex items-center gap-2"
+          >
+            <Bot className="w-5 h-5" />
+            AI Rádce
           </button>
         </div>
       </section>
@@ -164,6 +180,25 @@ export default function Home() {
           cards={compareCards}
           onRemoveCard={handleRemoveFromCompare}
           onClose={() => setShowCompare(false)}
+        />
+      )}
+
+      {/* Collection Modal */}
+      {showCollection && (
+        <Collection
+          onClose={() => setShowCollection(false)}
+          onSelectCard={(card) => {
+            setSelectedCard(card);
+            setShowCollection(false);
+          }}
+        />
+      )}
+
+      {/* AI Advisor Modal */}
+      {showAIAdvisor && (
+        <AIAdvisor
+          card={selectedCard}
+          onClose={() => setShowAIAdvisor(false)}
         />
       )}
 

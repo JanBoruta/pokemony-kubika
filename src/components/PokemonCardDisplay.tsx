@@ -1,13 +1,15 @@
 "use client";
 
 import { PokemonCard, typeTranslations, rarityTranslations } from "@/types/pokemon";
-import { X } from "lucide-react";
+import { useCollectionStore } from "@/store/collectionStore";
+import { X, Plus, Check } from "lucide-react";
 
 interface PokemonCardDisplayProps {
   card: PokemonCard;
   onClose?: () => void;
   onCompare?: (card: PokemonCard) => void;
   showCompareButton?: boolean;
+  showCollectionButton?: boolean;
 }
 
 export default function PokemonCardDisplay({
@@ -15,7 +17,11 @@ export default function PokemonCardDisplay({
   onClose,
   onCompare,
   showCompareButton = true,
+  showCollectionButton = true,
 }: PokemonCardDisplayProps) {
+  const { addCard, isInCollection } = useCollectionStore();
+  const inCollection = isInCollection(card.id);
+
   const translateType = (type: string) => typeTranslations[type] || type;
   const translateRarity = (rarity: string) => rarityTranslations[rarity] || rarity;
 
@@ -178,15 +184,37 @@ export default function PokemonCardDisplay({
             </div>
           )}
 
-          {/* Compare Button */}
-          {showCompareButton && onCompare && (
-            <button
-              onClick={() => onCompare(card)}
-              className="pokemon-btn-yellow pokemon-btn mt-4"
-            >
-              Přidat k porovnání
-            </button>
-          )}
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 mt-4">
+            {showCollectionButton && (
+              <button
+                onClick={() => addCard(card)}
+                className={`pokemon-btn flex items-center gap-2 ${
+                  inCollection ? "bg-green-600 hover:bg-green-700" : ""
+                }`}
+              >
+                {inCollection ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Ve sbírce
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Přidat do sbírky
+                  </>
+                )}
+              </button>
+            )}
+            {showCompareButton && onCompare && (
+              <button
+                onClick={() => onCompare(card)}
+                className="pokemon-btn-yellow pokemon-btn"
+              >
+                Přidat k porovnání
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
