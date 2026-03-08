@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PokemonCard } from "@/types/pokemon";
-import { useCollectionStore } from "@/store/collectionStore";
+import { useCollectionStore, useItems } from "@/store/collectionStore";
 import { searchCards } from "@/lib/pokemon-api";
 import { Sparkles, RefreshCw, Plus, Check, Heart } from "lucide-react";
 
@@ -26,7 +26,8 @@ export default function Recommendations({ onSelectCard }: RecommendationsProps) 
   const [recommendations, setRecommendations] = useState<PokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [reason, setReason] = useState<string>("");
-  const { items, addCard, isInCollection, addFavorite, removeFavorite, isFavorite } = useCollectionStore();
+  const items = useItems();
+  const { addCard, isInCollection, addFavorite, removeFavorite, isFavorite } = useCollectionStore();
 
   useEffect(() => {
     generateRecommendations();

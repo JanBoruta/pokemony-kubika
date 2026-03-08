@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pokémony Kubíka | Sbírka Pokémon Karet",
+  title: "Pokémoni Kubíka | Sbírka Pokémon Karet",
   description: "Hledej, porovnávej a spravuj svou sbírku Pokémon karet",
 };
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PokemonCard, typeTranslations, rarityTranslations } from "@/types/pokemon";
-import { useCollectionStore, CollectionItem } from "@/store/collectionStore";
+import { useCollectionStore, useItems, CollectionItem } from "@/store/collectionStore";
 import { X, Trash2, Plus, Minus, Edit3, Check, BookOpen, Filter, Heart } from "lucide-react";
 
 interface CollectionProps {
@@ -11,7 +11,8 @@ interface CollectionProps {
 }
 
 export default function Collection({ onClose, onSelectCard }: CollectionProps) {
-  const { items, removeCard, updateQuantity, updateNotes, addFavorite, removeFavorite, isFavorite } = useCollectionStore();
+  const items = useItems();
+  const { removeCard, updateQuantity, updateNotes, addFavorite, removeFavorite, isFavorite } = useCollectionStore();
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [tempNotes, setTempNotes] = useState("");
   const [filterType, setFilterType] = useState<string>("all");

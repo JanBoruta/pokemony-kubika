@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { PokemonCard, typeTranslations, rarityTranslations } from "@/types/pokemon";
 import { useCollectionStore } from "@/store/collectionStore";
 import { useTranslationCache } from "@/store/translationCache";
-import { X, Plus, Check, Sparkles, Loader2, Zap, Heart } from "lucide-react";
+import { X, Plus, Check, Sparkles, Loader2, Zap, Heart, Bot } from "lucide-react";
 
 interface TranslatedAttack {
   originalName: string;
@@ -28,6 +28,7 @@ interface PokemonCardDisplayProps {
   card: PokemonCard;
   onClose?: () => void;
   onCompare?: (card: PokemonCard) => void;
+  onOpenAIAdvisor?: () => void;
   showCompareButton?: boolean;
   showCollectionButton?: boolean;
 }
@@ -36,6 +37,7 @@ export default function PokemonCardDisplay({
   card,
   onClose,
   onCompare,
+  onOpenAIAdvisor,
   showCompareButton = true,
   showCollectionButton = true,
 }: PokemonCardDisplayProps) {
@@ -406,6 +408,15 @@ export default function PokemonCardDisplay({
                 className="pokemon-btn-yellow pokemon-btn"
               >
                 Přidat k porovnání
+              </button>
+            )}
+            {onOpenAIAdvisor && (
+              <button
+                onClick={onOpenAIAdvisor}
+                className="pokemon-btn-red pokemon-btn flex items-center gap-2"
+              >
+                <Bot className="w-4 h-4" />
+                AI Rádce
               </button>
             )}
           </div>
