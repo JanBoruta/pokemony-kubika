@@ -72,7 +72,7 @@ const DEFAULT_PLAYER: Player = {
   id: "kubik-default",
   name: "Kubík",
   pin: "1212",
-  createdAt: Date.now(),
+  createdAt: 0, // Fixed value to avoid SSR/client mismatch
 };
 
 export const useCollectionStore = create<CollectionState>()(

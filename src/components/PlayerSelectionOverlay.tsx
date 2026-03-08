@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useCollectionStore, useIsLoggedIn } from "@/store/collectionStore";
+import { useCollectionStore, useIsLoggedIn, useActivePlayer } from "@/store/collectionStore";
 import { User, Plus, Lock, X, LogOut } from "lucide-react";
 
 export default function PlayerSelectionOverlay() {
   const isLoggedIn = useIsLoggedIn();
   const hasHydrated = useCollectionStore((state) => state.hasHydrated);
   const players = useCollectionStore((state) => state.players);
-  const activePlayerId = useCollectionStore((state) => state.activePlayerId);
+  const activePlayer = useActivePlayer();
   const loginPlayer = useCollectionStore((state) => state.loginPlayer);
   const addPlayer = useCollectionStore((state) => state.addPlayer);
   const logout = useCollectionStore((state) => state.logout);
-  const getActivePlayer = useCollectionStore((state) => state.getActivePlayer);
 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
@@ -33,7 +32,6 @@ export default function PlayerSelectionOverlay() {
 
   // Pokud je přihlášen, ukaž malý indikátor hráče
   if (isLoggedIn) {
-    const activePlayer = getActivePlayer();
     return (
       <div className="fixed top-4 right-4 z-50">
         <div className="flex items-center gap-2 bg-gray-800/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-gray-700">
