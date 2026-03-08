@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { PokemonCard } from "@/types/pokemon";
 import { useCollectionStore } from "@/store/collectionStore";
+import HydrationGuard from "@/components/HydrationGuard";
+import PlayerSelectionOverlay from "@/components/PlayerSelectionOverlay";
 import SearchInput from "@/components/SearchInput";
 import PokemonCardDisplay from "@/components/PokemonCardDisplay";
 import CompareCards from "@/components/CompareCards";
@@ -10,11 +12,12 @@ import Collection from "@/components/Collection";
 import AIAdvisor from "@/components/AIAdvisor";
 import AIChat from "@/components/AIChat";
 import Favorites from "@/components/Favorites";
+import FriendsCollection from "@/components/FriendsCollection";
 import Recommendations from "@/components/Recommendations";
 import CardScanner from "@/components/CardScanner";
-import { ArrowLeftRight, BookOpen, Bot, Heart, Download, Upload, Camera } from "lucide-react";
+import { ArrowLeftRight, BookOpen, Heart, Download, Upload, Camera, Users, LogOut, User } from "lucide-react";
 
-export default function Home() {
+function AppContent() {
   const [selectedCard, setSelectedCard] = useState<PokemonCard | null>(null);
   const [compareCards, setCompareCards] = useState<PokemonCard[]>([]);
   const [showCompare, setShowCompare] = useState(false);
@@ -22,10 +25,24 @@ export default function Home() {
   const [showAIAdvisor, setShowAIAdvisor] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const collectionItems = useCollectionStore((state) => state.items);
+  const [showFriends, setShowFriends] = useState(false);
+  const [showPlayerSelect, setShowPlayerSelect] = useState(false);
+
+  const items = useCollectionStore((state) => state.items);
   const favorites = useCollectionStore((state) => state.favorites);
+  const activePlayerId = useCollectionStore((state) => state.activePlayerId);
+  const players = useCollectionStore((state) => state.players);
+  const logoutPlayer = useCollectionStore((state) => state.logoutPlayer);
   const exportData = useCollectionStore((state) => state.exportData);
   const importData = useCollectionStore((state) => state.importData);
+
+  const activePlayer = players.find((p) => p.id === activePlayerId);
+  const hasFriends = players.length > 1;
+
+  // Show player selection if no active player
+  if (!activePlayerId) {
+    return <PlayerSelectionOverlay />;
+  }
 
   const handleExport = () => {
     const data = exportData();
@@ -33,7 +50,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `pokemon-sbirka-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `pokemon-sbirka-${activePlayer?.name || "export"}-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -50,9 +67,9 @@ export default function Home() {
           const content = event.target?.result as string;
           const success = importData(content);
           if (success) {
-            alert("Sbírka byla úspěšně importována!");
+            alert("Sbirka byla uspesne importovana!");
           } else {
-            alert("Chyba při importu. Zkontroluj formát souboru.");
+            alert("Chyba pri importu. Zkontroluj format souboru.");
           }
         };
         reader.readAsText(file);
@@ -67,11 +84,11 @@ export default function Home() {
 
   const handleAddToCompare = (card: PokemonCard) => {
     if (compareCards.length >= 4) {
-      alert("Můžeš porovnat maximálně 4 karty najednou!");
+      alert("Muzes porovnat maximalne 4 karty najednou!");
       return;
     }
     if (compareCards.find((c) => c.id === card.id)) {
-      alert("Tato karta už je v porovnání!");
+      alert("Tato karta uz je v porovnani!");
       return;
     }
     setCompareCards([...compareCards, card]);
@@ -81,11 +98,39 @@ export default function Home() {
     setCompareCards(compareCards.filter((c) => c.id !== cardId));
   };
 
+  const handleOpenAIAdvisor = () => {
+    setShowAIAdvisor(true);
+  };
+
   return (
     <main className="min-h-screen">
-      {/* Header - Indigo League styl */}
+      {/* Player Indicator */}
+      <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
+        <button
+          onClick={() => setShowPlayerSelect(true)}
+          className="flex items-center gap-2 bg-[#1a1a2e]/90 backdrop-blur-sm rounded-full px-3 py-2 border border-white/10 hover:border-[#FFCB05] transition-all"
+        >
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+            style={{ backgroundColor: activePlayer?.avatarColor || "#FFCB05" }}
+          >
+            {activePlayer?.name.charAt(0).toUpperCase() || "?"}
+          </div>
+          <span className="text-white text-sm font-medium hidden sm:inline">
+            {activePlayer?.name}
+          </span>
+        </button>
+        <button
+          onClick={logoutPlayer}
+          className="p-2 bg-[#1a1a2e]/90 backdrop-blur-sm rounded-full border border-white/10 hover:border-red-500 hover:bg-red-500/20 transition-all"
+          title="Odhlasit se"
+        >
+          <LogOut className="w-4 h-4 text-gray-400 hover:text-red-400" />
+        </button>
+      </div>
+
+      {/* Header */}
       <header className="py-8 px-4 relative overflow-hidden">
-        {/* Pikachu ilustrace */}
         <div className="absolute -left-8 md:left-8 top-1/2 -translate-y-1/2 opacity-20 md:opacity-40 pointer-events-none">
           <img
             src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"
@@ -103,27 +148,22 @@ export default function Home() {
           />
         </div>
         <div className="container mx-auto text-center relative z-10">
-          {/* Pokéball dekorace nad logem */}
           <div className="flex justify-center mb-4">
             <div className="w-12 h-12 rounded-full border-4 border-gray-700 relative overflow-hidden">
-              {/* Horní červená polovina */}
               <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-red-500 to-red-600"></div>
-              {/* Spodní bílá polovina */}
               <div className="absolute inset-x-0 bottom-0 h-1/2 bg-white"></div>
-              {/* Střední linka */}
               <div className="absolute inset-x-0 top-1/2 h-1 bg-gray-700 -translate-y-1/2 z-10"></div>
-              {/* Střední tlačítko */}
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-2 border-gray-700 z-20"></div>
             </div>
           </div>
           <h1 className="pokemon-logo text-4xl md:text-6xl font-bold mb-2">
-            Pokémony Kubíka
+            Pokemony Kubika
           </h1>
           <p className="text-gray-300 text-lg font-medium">
-            Hledej, porovnávej a objevuj svět Pokémon karet
+            Hledej, porovnavej a objevuj svet Pokemon karet
           </p>
           <p className="text-yellow-500 text-sm mt-2 font-semibold tracking-wider">
-            ⚡ INDIGO LEAGUE EDICE ⚡
+            INDIGO LEAGUE EDICE
           </p>
         </div>
       </header>
@@ -153,14 +193,7 @@ export default function Home() {
             className="pokemon-btn-yellow pokemon-btn flex items-center gap-2"
           >
             <BookOpen className="w-5 h-5" />
-            Moje sbírka ({collectionItems.length})
-          </button>
-          <button
-            onClick={() => setShowAIAdvisor(true)}
-            className="pokemon-btn-red pokemon-btn flex items-center gap-2"
-          >
-            <Bot className="w-5 h-5" />
-            AI Rádce
+            Moje sbirka ({items.length})
           </button>
           <button
             onClick={() => setShowFavorites(true)}
@@ -168,8 +201,18 @@ export default function Home() {
             style={{ background: "linear-gradient(135deg, #e91e63, #c2185b)" }}
           >
             <Heart className="w-5 h-5" />
-            Oblíbené ({favorites.length})
+            Oblibene ({favorites.length})
           </button>
+          {hasFriends && (
+            <button
+              onClick={() => setShowFriends(true)}
+              className="pokemon-btn flex items-center gap-2"
+              style={{ background: "linear-gradient(135deg, #9C27B0, #7B1FA2)" }}
+            >
+              <Users className="w-5 h-5" />
+              Kamaradi
+            </button>
+          )}
           <button
             onClick={() => setShowScanner(true)}
             className="pokemon-btn flex items-center gap-2"
@@ -189,6 +232,7 @@ export default function Home() {
               card={selectedCard}
               onClose={() => setSelectedCard(null)}
               onCompare={handleAddToCompare}
+              onOpenAIAdvisor={handleOpenAIAdvisor}
             />
           </div>
         </section>
@@ -263,6 +307,17 @@ export default function Home() {
         />
       )}
 
+      {/* Friends Collection Modal */}
+      {showFriends && (
+        <FriendsCollection
+          onClose={() => setShowFriends(false)}
+          onSelectCard={(card) => {
+            setSelectedCard(card);
+            setShowFriends(false);
+          }}
+        />
+      )}
+
       {/* Card Scanner Modal */}
       {showScanner && (
         <CardScanner
@@ -274,23 +329,27 @@ export default function Home() {
         />
       )}
 
+      {/* Player Selection Modal (when clicking on player indicator) */}
+      {showPlayerSelect && (
+        <PlayerSelectionOverlay onClose={() => setShowPlayerSelect(false)} />
+      )}
+
       {/* Footer */}
       <footer className="py-8 px-4 mt-8 border-t border-white/10">
         <div className="container mx-auto">
-          {/* Backup/Restore buttons */}
           <div className="flex justify-center gap-4 mb-6">
             <button
               onClick={handleExport}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors text-gray-300"
-              title="Zálohovat sbírku"
+              title="Zalohovat sbirku"
             >
               <Download className="w-4 h-4" />
-              Záloha sbírky
+              Zaloha sbirky
             </button>
             <button
               onClick={handleImport}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors text-gray-300"
-              title="Obnovit sbírku ze zálohy"
+              title="Obnovit sbirku ze zalohy"
             >
               <Upload className="w-4 h-4" />
               Obnovit
@@ -300,12 +359,20 @@ export default function Home() {
           <div className="text-center text-gray-500 text-sm">
             <p>Data poskytuje TCGdex API</p>
             <p className="mt-1">
-              Pokémon a všechny související názvy jsou ochranné známky Nintendo,
+              Pokemon a vsechny souvisejici nazvy jsou ochranne znamky Nintendo,
               Creatures Inc. a GAME FREAK inc.
             </p>
           </div>
         </div>
       </footer>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <HydrationGuard>
+      <AppContent />
+    </HydrationGuard>
   );
 }
