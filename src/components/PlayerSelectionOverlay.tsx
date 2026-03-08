@@ -6,12 +6,12 @@ import { User, Plus, Lock, X, LogOut } from "lucide-react";
 
 export default function PlayerSelectionOverlay() {
   const isLoggedIn = useIsLoggedIn();
-  const hasHydrated = useCollectionStore((state) => state.hasHydrated);
-  const players = useCollectionStore((state) => state.players);
+  const hasHydrated = useCollectionStore((state) => state?.hasHydrated ?? false);
+  const players = useCollectionStore((state) => state?.players ?? []);
   const activePlayer = useActivePlayer();
-  const loginPlayer = useCollectionStore((state) => state.loginPlayer);
-  const addPlayer = useCollectionStore((state) => state.addPlayer);
-  const logout = useCollectionStore((state) => state.logout);
+  const loginPlayer = useCollectionStore((state) => state?.loginPlayer);
+  const addPlayer = useCollectionStore((state) => state?.addPlayer);
+  const logout = useCollectionStore((state) => state?.logout);
 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [pin, setPin] = useState("");

@@ -11,9 +11,9 @@ interface FriendsCollectionProps {
 }
 
 export default function FriendsCollection({ onClose, onSelectCard }: FriendsCollectionProps) {
-  const players = useCollectionStore((state) => state.players);
-  const activePlayerId = useCollectionStore((state) => state.activePlayerId);
-  const dataByPlayerId = useCollectionStore((state) => state.dataByPlayerId);
+  const players = useCollectionStore((state) => state?.players ?? []);
+  const activePlayerId = useCollectionStore((state) => state?.activePlayerId ?? null);
+  const dataByPlayerId = useCollectionStore((state) => state?.dataByPlayerId ?? {});
   const { addCard, isInCollection, addFavorite, isFavorite } = useCollectionStore();
 
   const [selectedFriend, setSelectedFriend] = useState<Player | null>(null);

@@ -427,23 +427,30 @@ export const useCollectionStore = create<CollectionState>()(
   )
 );
 
-// Selektory pro snadnější použití
+// Selektory pro snadnější použití - s obrannými kontrolami
 export const useActivePlayer = () =>
-  useCollectionStore((state) =>
-    state.players.find((p) => p.id === state.activePlayerId) ?? null
-  );
+  useCollectionStore((state) => {
+    if (!state?.players || !state?.activePlayerId) return null;
+    return state.players.find((p) => p.id === state.activePlayerId) ?? null;
+  });
 
 export const useIsLoggedIn = () =>
-  useCollectionStore((state) => state.activePlayerId !== null);
+  useCollectionStore((state) => {
+    return state?.activePlayerId != null;
+  });
 
 export const useItems = () =>
   useCollectionStore((state) => {
-    if (!state.activePlayerId) return [];
-    return state.dataByPlayerId[state.activePlayerId]?.items ?? [];
+    if (!state?.activePlayerId || !state?.dataByPlayerId) return [];
+    const playerData = state.dataByPlayerId[state.activePlayerId];
+    if (!playerData?.items) return [];
+    return playerData.items;
   });
 
 export const useFavorites = () =>
   useCollectionStore((state) => {
-    if (!state.activePlayerId) return [];
-    return state.dataByPlayerId[state.activePlayerId]?.favorites ?? [];
+    if (!state?.activePlayerId || !state?.dataByPlayerId) return [];
+    const playerData = state.dataByPlayerId[state.activePlayerId];
+    if (!playerData?.favorites) return [];
+    return playerData.favorites;
   });
