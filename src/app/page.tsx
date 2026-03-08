@@ -135,8 +135,7 @@ function AppContent() {
           <img
             src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"
             alt="Pikachu"
-            className="w-32 md:w-48 h-auto drop-shadow-2xl animate-bounce"
-            style={{ animationDuration: '3s' }}
+            className="w-32 md:w-48 h-auto drop-shadow-2xl"
           />
         </div>
         <div className="absolute -right-8 md:right-8 top-1/2 -translate-y-1/2 opacity-20 md:opacity-40 pointer-events-none">

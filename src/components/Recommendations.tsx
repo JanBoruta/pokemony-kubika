@@ -37,10 +37,13 @@ export default function Recommendations({ onSelectCard }: RecommendationsProps) 
 
     try {
       if (items.length === 0) {
-        // Pokud nemá sbírku, ukáž populární karty
-        const popular = await searchCards("ex", 1, 6);
-        setRecommendations(popular.data || []);
-        setReason("Populární karty pro začátek tvé sbírky");
+        // Pokud nema sbirku, ukaz popularni karty
+        const popular = await searchCards("ex", 1, 20);
+        const pokemonCards = (popular.data || [])
+          .filter(c => c.category === "Pokemon")
+          .slice(0, 6);
+        setRecommendations(pokemonCards);
+        setReason("Popularni karty pro zacatek tve sbirky");
         return;
       }
 
@@ -93,29 +96,59 @@ export default function Recommendations({ onSelectCard }: RecommendationsProps) 
           reasonText = `Další verze ${randomStage2.name.split(" ")[0]}`;
         }
       } else if (favoriteType) {
-        // Doporuč karty oblíbeného typu
-        searchQuery = favoriteType;
-        reasonText = `${favoriteType} typ - tvůj oblíbený!`;
+        // Doporuč karty oblíbeného typu - hledej Pokemony daného typu
+        // Použij anglické názvy typů pro lepší výsledky
+        const typeSearchTerms: Record<string, string> = {
+          "Darkness": "Dark Pokemon",
+          "Fire": "Fire Pokemon",
+          "Water": "Water Pokemon",
+          "Grass": "Grass Pokemon",
+          "Lightning": "Electric Pokemon",
+          "Psychic": "Psychic Pokemon",
+          "Fighting": "Fighting Pokemon",
+          "Metal": "Steel Pokemon",
+          "Dragon": "Dragon Pokemon",
+          "Fairy": "Fairy Pokemon",
+          "Colorless": "Normal Pokemon",
+        };
+        searchQuery = typeSearchTerms[favoriteType] || `${favoriteType} Pokemon`;
+        reasonText = `${favoriteType} typ - tvuj oblibeny!`;
       } else {
         // Fallback na populární karty
         searchQuery = "ex";
         reasonText = "Silné ex karty";
       }
 
-      const results = await searchCards(searchQuery, 1, 12);
+      const results = await searchCards(searchQuery, 1, 30);
       let cards = results.data || [];
+
+      // Filtruj energie a trenery - chceme jen Pokemony
+      cards = cards.filter(c => c.category === "Pokemon");
 
       // Filtruj karty které už má ve sbírce
       cards = cards.filter(c => !isInCollection(c.id));
+
+      // Deduplikuj podle jména (různé verze stejného Pokemona)
+      const seenNames = new Set<string>();
+      cards = cards.filter(c => {
+        const baseName = c.name.split(" ")[0]; // Základní jméno bez "ex", "V", atd.
+        if (seenNames.has(baseName)) return false;
+        seenNames.add(baseName);
+        return true;
+      });
 
       // Omez na 6 karet
       cards = cards.slice(0, 6);
 
       if (cards.length === 0) {
-        // Fallback
-        const fallback = await searchCards("Pokemon", 1, 6);
-        cards = (fallback.data || []).filter(c => !isInCollection(c.id)).slice(0, 6);
-        reasonText = "Další karty k objevení";
+        // Fallback - hledej populární Pokemony
+        const fallbackSearches = ["Pikachu", "Charizard", "Eevee", "Mewtwo", "Gengar"];
+        const randomSearch = fallbackSearches[Math.floor(Math.random() * fallbackSearches.length)];
+        const fallback = await searchCards(randomSearch, 1, 20);
+        cards = (fallback.data || [])
+          .filter(c => c.category === "Pokemon" && !isInCollection(c.id))
+          .slice(0, 6);
+        reasonText = "Dalsi karty k objeveni";
       }
 
       setRecommendations(cards);

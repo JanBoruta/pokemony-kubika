@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useCollectionStore, Player } from "@/store/collectionStore";
-import { User, Plus, Lock, LogIn, X } from "lucide-react";
+import { User, Plus, Lock, LogIn, X, Loader2 } from "lucide-react";
 
 interface PlayerSelectionOverlayProps {
   onClose?: () => void;
@@ -17,6 +17,7 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
   const [newName, setNewName] = useState("");
   const [newPin, setNewPin] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   // If already logged in and this is shown as modal, allow closing
   const canClose = activePlayerId && onClose;
@@ -28,19 +29,28 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
     setError("");
   };
 
-  const handleLogin = () => {
-    if (!selectedPlayer) return;
+  const handleLogin = async () => {
+    if (!selectedPlayer || isLoading) return;
 
-    const success = loginPlayer(selectedPlayer.id, pin);
-    if (success) {
-      onClose?.();
-    } else {
-      setError("Spatny PIN!");
-      setPin("");
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const success = await loginPlayer(selectedPlayer.id, pin);
+      if (success) {
+        onClose?.();
+      } else {
+        setError("Spatny PIN!");
+        setPin("");
+      }
+    } catch {
+      setError("Chyba pri prihlaseni");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleCreatePlayer = () => {
+  const handleCreatePlayer = async () => {
     if (!newName.trim()) {
       setError("Zadej jmeno!");
       return;
@@ -50,12 +60,25 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
       return;
     }
 
-    createPlayer(newName.trim(), newPin);
-    onClose?.();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const result = await createPlayer(newName.trim(), newPin);
+      if (result) {
+        onClose?.();
+      } else {
+        setError("Chyba pri vytvareni profilu");
+      }
+    } catch {
+      setError("Chyba pri vytvareni profilu");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !isLoading) {
       action();
     }
   };
@@ -162,7 +185,8 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
                 placeholder="****"
                 maxLength={8}
                 autoFocus
-                className="w-full bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-xl px-4 py-3 text-white text-center text-2xl tracking-widest focus:border-[#FFCB05] focus:outline-none"
+                disabled={isLoading}
+                className="w-full bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-xl px-4 py-3 text-white text-center text-2xl tracking-widest focus:border-[#FFCB05] focus:outline-none disabled:opacity-50"
               />
             </div>
 
@@ -172,11 +196,15 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
 
             <button
               onClick={handleLogin}
-              disabled={pin.length < 4}
+              disabled={pin.length < 4 || isLoading}
               className="w-full p-4 rounded-xl bg-[#FFCB05] hover:bg-[#FFD700] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold flex items-center justify-center gap-2 transition-colors"
             >
-              <LogIn className="w-5 h-5" />
-              Prihlasit se
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <LogIn className="w-5 h-5" />
+              )}
+              {isLoading ? "Prihlasuji..." : "Prihlasit se"}
             </button>
 
             <button
@@ -186,7 +214,8 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
                 setPin("");
                 setError("");
               }}
-              className="w-full p-3 text-gray-400 hover:text-white transition-colors"
+              disabled={isLoading}
+              className="w-full p-3 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
             >
               Zpet na vyber
             </button>
@@ -205,11 +234,11 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, () => {})}
                 placeholder="napr. Kubik"
                 maxLength={20}
                 autoFocus
-                className="w-full bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-xl px-4 py-3 text-white focus:border-[#FFCB05] focus:outline-none"
+                disabled={isLoading}
+                className="w-full bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-xl px-4 py-3 text-white focus:border-[#FFCB05] focus:outline-none disabled:opacity-50"
               />
             </div>
 
@@ -225,7 +254,8 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
                 onKeyDown={(e) => handleKeyDown(e, handleCreatePlayer)}
                 placeholder="****"
                 maxLength={8}
-                className="w-full bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-xl px-4 py-3 text-white text-center text-2xl tracking-widest focus:border-[#FFCB05] focus:outline-none"
+                disabled={isLoading}
+                className="w-full bg-[#0f0f23] border-2 border-[#3B4CCA] rounded-xl px-4 py-3 text-white text-center text-2xl tracking-widest focus:border-[#FFCB05] focus:outline-none disabled:opacity-50"
               />
             </div>
 
@@ -235,11 +265,15 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
 
             <button
               onClick={handleCreatePlayer}
-              disabled={!newName.trim() || newPin.length < 4}
+              disabled={!newName.trim() || newPin.length < 4 || isLoading}
               className="w-full p-4 rounded-xl bg-[#FFCB05] hover:bg-[#FFD700] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold flex items-center justify-center gap-2 transition-colors"
             >
-              <Plus className="w-5 h-5" />
-              Vytvorit profil
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Plus className="w-5 h-5" />
+              )}
+              {isLoading ? "Vytvarim..." : "Vytvorit profil"}
             </button>
 
             {players.length > 0 && (
@@ -250,7 +284,8 @@ export default function PlayerSelectionOverlay({ onClose }: PlayerSelectionOverl
                   setNewPin("");
                   setError("");
                 }}
-                className="w-full p-3 text-gray-400 hover:text-white transition-colors"
+                disabled={isLoading}
+                className="w-full p-3 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
               >
                 Zpet na vyber
               </button>

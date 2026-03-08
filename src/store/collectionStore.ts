@@ -21,7 +21,6 @@ export interface FavoriteItem {
 export interface Player {
   id: string;
   name: string;
-  pin: string;
   createdAt: string;
   avatarColor: string;
 }
@@ -34,6 +33,7 @@ export interface PlayerData {
 interface CollectionState {
   // Hydration tracking
   _hasHydrated: boolean;
+  _serverSynced: boolean;
   setHasHydrated: (value: boolean) => void;
 
   // Player management
@@ -42,8 +42,9 @@ interface CollectionState {
   playerData: Record<string, PlayerData>;
 
   // Player actions
-  createPlayer: (name: string, pin: string) => string;
-  loginPlayer: (playerId: string, pin: string) => boolean;
+  fetchPlayersFromServer: () => Promise<void>;
+  createPlayer: (name: string, pin: string) => Promise<string | null>;
+  loginPlayer: (playerId: string, pin: string) => Promise<boolean>;
   logoutPlayer: () => void;
   getActivePlayer: () => Player | null;
   getAllPlayers: () => Player[];
@@ -68,6 +69,9 @@ interface CollectionState {
   isFavorite: (cardId: string) => boolean;
   clearFavorites: () => void;
 
+  // Sync
+  syncToServer: () => Promise<void>;
+
   // Import/Export
   exportData: () => string;
   importData: (jsonData: string) => boolean;
@@ -79,28 +83,28 @@ const generateId = (): string => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
 
-const AVATAR_COLORS = [
-  "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4",
-  "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F",
-  "#BB8FCE", "#85C1E9", "#F8B500", "#00CED1"
-];
-
-const getRandomColor = (): string => {
-  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
-};
-
 const getEmptyPlayerData = (): PlayerData => ({
   items: [],
   favorites: [],
 });
+
+// Debounce sync to server
+let syncTimeout: NodeJS.Timeout | null = null;
+const debouncedSync = (syncFn: () => Promise<void>) => {
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => {
+    syncFn();
+  }, 1000);
+};
 
 // ============ STORE ============
 
 export const useCollectionStore = create<CollectionState>()(
   persist(
     (set, get) => ({
-      // Hydration tracking - starts false, set to true after rehydration
+      // Hydration tracking
       _hasHydrated: false,
+      _serverSynced: false,
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
 
       // Player management state
@@ -108,57 +112,185 @@ export const useCollectionStore = create<CollectionState>()(
       activePlayerId: null,
       playerData: {},
 
-      // Computed values - will be synced with active player's data
+      // Computed values
       items: [],
       favorites: [],
 
-      // ============ PLAYER ACTIONS ============
+      // ============ SERVER SYNC ============
 
-      createPlayer: (name: string, pin: string) => {
-        const id = generateId();
-        const now = new Date().toISOString();
-        const newPlayer: Player = {
-          id,
-          name,
-          pin,
-          createdAt: now,
-          avatarColor: getRandomColor(),
-        };
+      fetchPlayersFromServer: async () => {
+        try {
+          const response = await fetch("/api/players");
+          const data = await response.json();
 
-        set((state) => ({
-          players: [...state.players, newPlayer],
-          playerData: {
-            ...state.playerData,
-            [id]: getEmptyPlayerData(),
-          },
-          activePlayerId: id,
-          items: [],
-          favorites: [],
-        }));
+          if (data.players && Array.isArray(data.players)) {
+            set((state) => {
+              // Merge server players with local (server takes precedence for player list)
+              const serverPlayerIds = new Set(data.players.map((p: Player) => p.id));
 
-        return id;
+              // Keep local players that don't exist on server (newly created offline)
+              const localOnlyPlayers = state.players.filter(p => !serverPlayerIds.has(p.id));
+
+              // Merge player data
+              const mergedPlayerData = { ...state.playerData };
+              for (const [playerId, pData] of Object.entries(data.playerData || {})) {
+                // Server data takes precedence, but merge if local has more items
+                const serverData = pData as PlayerData;
+                const localData = state.playerData[playerId];
+
+                if (!localData) {
+                  mergedPlayerData[playerId] = serverData;
+                } else {
+                  // Use whichever has more items (simple merge strategy)
+                  mergedPlayerData[playerId] = {
+                    items: serverData.items.length >= localData.items.length ? serverData.items : localData.items,
+                    favorites: serverData.favorites.length >= localData.favorites.length ? serverData.favorites : localData.favorites,
+                  };
+                }
+              }
+
+              const newPlayers = [...data.players, ...localOnlyPlayers];
+
+              // If we have an active player, update items/favorites
+              let newItems = state.items;
+              let newFavorites = state.favorites;
+              if (state.activePlayerId && mergedPlayerData[state.activePlayerId]) {
+                newItems = mergedPlayerData[state.activePlayerId].items;
+                newFavorites = mergedPlayerData[state.activePlayerId].favorites;
+              }
+
+              return {
+                players: newPlayers,
+                playerData: mergedPlayerData,
+                items: newItems,
+                favorites: newFavorites,
+                _serverSynced: true,
+              };
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch players from server:", error);
+          set({ _serverSynced: true }); // Mark as synced even on error to not block UI
+        }
       },
 
-      loginPlayer: (playerId: string, pin: string) => {
+      syncToServer: async () => {
         const state = get();
-        const player = state.players.find((p) => p.id === playerId);
+        if (!state.activePlayerId) return;
 
-        if (!player || player.pin !== pin) {
+        try {
+          await fetch("/api/players", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              playerId: state.activePlayerId,
+              items: state.items,
+              favorites: state.favorites,
+            }),
+          });
+        } catch (error) {
+          console.error("Failed to sync to server:", error);
+        }
+      },
+
+      // ============ PLAYER ACTIONS ============
+
+      createPlayer: async (name: string, pin: string) => {
+        try {
+          const response = await fetch("/api/players", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "create", name, pin }),
+          });
+
+          const data = await response.json();
+
+          if (data.success && data.player) {
+            const player = data.player as Player;
+
+            set((state) => ({
+              players: [...state.players, player],
+              playerData: {
+                ...state.playerData,
+                [player.id]: getEmptyPlayerData(),
+              },
+              activePlayerId: player.id,
+              items: [],
+              favorites: [],
+            }));
+
+            return player.id;
+          }
+
+          // Fallback to local creation if server fails
+          const id = generateId();
+          const now = new Date().toISOString();
+          const AVATAR_COLORS = [
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4",
+            "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F",
+            "#BB8FCE", "#85C1E9", "#F8B500", "#00CED1"
+          ];
+
+          const newPlayer: Player = {
+            id,
+            name,
+            createdAt: now,
+            avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
+          };
+
+          set((state) => ({
+            players: [...state.players, newPlayer],
+            playerData: {
+              ...state.playerData,
+              [id]: getEmptyPlayerData(),
+            },
+            activePlayerId: id,
+            items: [],
+            favorites: [],
+          }));
+
+          return id;
+        } catch (error) {
+          console.error("Error creating player:", error);
+          return null;
+        }
+      },
+
+      loginPlayer: async (playerId: string, pin: string) => {
+        try {
+          // Verify PIN with server
+          const response = await fetch("/api/players", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "verify", playerId, pin }),
+          });
+
+          const data = await response.json();
+
+          if (!data.success) {
+            return false;
+          }
+
+          const state = get();
+          const playerData = state.playerData[playerId] || getEmptyPlayerData();
+
+          set({
+            activePlayerId: playerId,
+            items: playerData.items,
+            favorites: playerData.favorites,
+          });
+
+          return true;
+        } catch (error) {
+          console.error("Error logging in:", error);
           return false;
         }
-
-        const data = state.playerData[playerId] || getEmptyPlayerData();
-
-        set({
-          activePlayerId: playerId,
-          items: data.items,
-          favorites: data.favorites,
-        });
-
-        return true;
       },
 
       logoutPlayer: () => {
+        // Sync before logout
+        get().syncToServer();
+
         set({
           activePlayerId: null,
           items: [],
@@ -217,6 +349,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       removeCard: (cardId: string) => {
@@ -235,6 +369,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       updateQuantity: (cardId: string, quantity: number) => {
@@ -260,6 +396,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       updateNotes: (cardId: string, notes: string) => {
@@ -280,6 +418,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       isInCollection: (cardId: string) => {
@@ -304,6 +444,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       // ============ FAVORITES ACTIONS ============
@@ -333,6 +475,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       removeFavorite: (cardId: string) => {
@@ -351,6 +495,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       isFavorite: (cardId: string) => {
@@ -371,6 +517,8 @@ export const useCollectionStore = create<CollectionState>()(
             },
           },
         }));
+
+        debouncedSync(() => get().syncToServer());
       },
 
       // ============ IMPORT/EXPORT ============
@@ -391,7 +539,6 @@ export const useCollectionStore = create<CollectionState>()(
         try {
           const data = JSON.parse(jsonData);
 
-          // Version 2 format (multi-player)
           if (data.version === 2 && data.players) {
             set({
               players: data.players,
@@ -403,7 +550,6 @@ export const useCollectionStore = create<CollectionState>()(
             return true;
           }
 
-          // Version 1 format (legacy single player) - migrate to active player
           if (data.items && Array.isArray(data.items)) {
             const state = get();
             if (!state.activePlayerId) return false;
@@ -429,13 +575,15 @@ export const useCollectionStore = create<CollectionState>()(
       },
     }),
     {
-      name: "pokemon-collection-v3",
+      name: "pokemon-collection-v4",
       onRehydrateStorage: () => (state) => {
-        // Called when store has been rehydrated from localStorage
         if (state) {
           state.setHasHydrated(true);
 
-          // Sync items/favorites with active player's data after rehydration
+          // Fetch players from server after hydration
+          state.fetchPlayersFromServer();
+
+          // Sync items/favorites with active player's data
           if (state.activePlayerId && state.playerData[state.activePlayerId]) {
             const data = state.playerData[state.activePlayerId];
             state.items = data.items;
@@ -443,42 +591,7 @@ export const useCollectionStore = create<CollectionState>()(
           }
         }
       },
-      // Migrate from old storage format
-      migrate: (persistedState: unknown, version: number) => {
-        const state = persistedState as Partial<CollectionState> & {
-          items?: CollectionItem[];
-          favorites?: FavoriteItem[];
-        };
-
-        // If we have old format data (items at root level but no players)
-        if (state.items && (!state.players || state.players.length === 0)) {
-          // Create default player with old data
-          const defaultPlayerId = generateId();
-          const defaultPlayer: Player = {
-            id: defaultPlayerId,
-            name: "Kubik",
-            pin: "1212",
-            createdAt: new Date().toISOString(),
-            avatarColor: "#FFCB05",
-          };
-
-          return {
-            ...state,
-            players: [defaultPlayer],
-            activePlayerId: defaultPlayerId,
-            playerData: {
-              [defaultPlayerId]: {
-                items: state.items || [],
-                favorites: state.favorites || [],
-              },
-            },
-            _hasHydrated: false,
-          };
-        }
-
-        return state as CollectionState;
-      },
-      version: 3,
+      version: 4,
     }
   )
 );
