@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PokemonCard } from "@/types/pokemon";
-import { useCollectionStore, useItems, useFavorites } from "@/store/collectionStore";
+import { useCollectionStore } from "@/store/collectionStore";
 import SearchInput from "@/components/SearchInput";
 import PokemonCardDisplay from "@/components/PokemonCardDisplay";
 import CompareCards from "@/components/CompareCards";
@@ -12,9 +12,7 @@ import AIChat from "@/components/AIChat";
 import Favorites from "@/components/Favorites";
 import Recommendations from "@/components/Recommendations";
 import CardScanner from "@/components/CardScanner";
-import PlayerSelectionOverlay from "@/components/PlayerSelectionOverlay";
-import FriendsCollection from "@/components/FriendsCollection";
-import { ArrowLeftRight, BookOpen, Heart, Download, Upload, Camera, Users } from "lucide-react";
+import { ArrowLeftRight, BookOpen, Bot, Heart, Download, Upload, Camera } from "lucide-react";
 
 export default function Home() {
   const [selectedCard, setSelectedCard] = useState<PokemonCard | null>(null);
@@ -24,9 +22,8 @@ export default function Home() {
   const [showAIAdvisor, setShowAIAdvisor] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [showFriends, setShowFriends] = useState(false);
-  const collectionItems = useItems();
-  const favorites = useFavorites();
+  const collectionItems = useCollectionStore((state) => state.items);
+  const favorites = useCollectionStore((state) => state.favorites);
   const exportData = useCollectionStore((state) => state.exportData);
   const importData = useCollectionStore((state) => state.importData);
 
@@ -86,9 +83,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      {/* Player Selection Overlay */}
-      <PlayerSelectionOverlay />
-
       {/* Header - Indigo League styl */}
       <header className="py-8 px-4 relative overflow-hidden">
         {/* Pikachu ilustrace */}
@@ -96,7 +90,8 @@ export default function Home() {
           <img
             src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"
             alt="Pikachu"
-            className="w-32 md:w-48 h-auto drop-shadow-2xl"
+            className="w-32 md:w-48 h-auto drop-shadow-2xl animate-bounce"
+            style={{ animationDuration: '3s' }}
           />
         </div>
         <div className="absolute -right-8 md:right-8 top-1/2 -translate-y-1/2 opacity-20 md:opacity-40 pointer-events-none">
@@ -122,7 +117,7 @@ export default function Home() {
             </div>
           </div>
           <h1 className="pokemon-logo text-4xl md:text-6xl font-bold mb-2">
-            Pokémoni Kubíka
+            Pokémony Kubíka
           </h1>
           <p className="text-gray-300 text-lg font-medium">
             Hledej, porovnávej a objevuj svět Pokémon karet
@@ -161,20 +156,19 @@ export default function Home() {
             Moje sbírka ({collectionItems.length})
           </button>
           <button
+            onClick={() => setShowAIAdvisor(true)}
+            className="pokemon-btn-red pokemon-btn flex items-center gap-2"
+          >
+            <Bot className="w-5 h-5" />
+            AI Rádce
+          </button>
+          <button
             onClick={() => setShowFavorites(true)}
             className="pokemon-btn flex items-center gap-2"
             style={{ background: "linear-gradient(135deg, #e91e63, #c2185b)" }}
           >
             <Heart className="w-5 h-5" />
             Oblíbené ({favorites.length})
-          </button>
-          <button
-            onClick={() => setShowFriends(true)}
-            className="pokemon-btn flex items-center gap-2"
-            style={{ background: "linear-gradient(135deg, #8B5CF6, #7C3AED)" }}
-          >
-            <Users className="w-5 h-5" />
-            Kamarádi
           </button>
           <button
             onClick={() => setShowScanner(true)}
@@ -195,7 +189,6 @@ export default function Home() {
               card={selectedCard}
               onClose={() => setSelectedCard(null)}
               onCompare={handleAddToCompare}
-              onOpenAIAdvisor={() => setShowAIAdvisor(true)}
             />
           </div>
         </section>
@@ -277,17 +270,6 @@ export default function Home() {
           onCardFound={(card) => {
             setSelectedCard(card);
             setShowScanner(false);
-          }}
-        />
-      )}
-
-      {/* Friends Collection Modal */}
-      {showFriends && (
-        <FriendsCollection
-          onClose={() => setShowFriends(false)}
-          onSelectCard={(card) => {
-            setSelectedCard(card);
-            setShowFriends(false);
           }}
         />
       )}

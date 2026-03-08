@@ -1,7 +1,7 @@
 "use client";
 
 import { PokemonCard, typeTranslations } from "@/types/pokemon";
-import { useCollectionStore, useFavorites } from "@/store/collectionStore";
+import { useCollectionStore } from "@/store/collectionStore";
 import { Heart, X, Trash2 } from "lucide-react";
 
 interface FavoritesProps {
@@ -10,8 +10,7 @@ interface FavoritesProps {
 }
 
 export default function Favorites({ onClose, onSelectCard }: FavoritesProps) {
-  const favorites = useFavorites();
-  const { removeFavorite, clearFavorites } = useCollectionStore();
+  const { favorites, removeFavorite, clearFavorites } = useCollectionStore();
 
   const getImageUrl = (card: PokemonCard) => {
     if (card.image) {

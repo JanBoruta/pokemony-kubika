@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useCollectionStore, useItems } from "@/store/collectionStore";
+import { useCollectionStore } from "@/store/collectionStore";
 import { getAllImportedCards } from "@/data/import-cards";
 import { Check, Trash2, Upload, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -9,8 +9,7 @@ import Link from "next/link";
 export default function ImportPage() {
   const [imported, setImported] = useState(false);
   const [cleared, setCleared] = useState(false);
-  const { clearCollection, addCard } = useCollectionStore();
-  const items = useItems();
+  const { clearCollection, addCard, items } = useCollectionStore();
 
   const handleClearAndImport = () => {
     // Smazat sbírku

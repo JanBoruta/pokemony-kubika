@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { PokemonCard } from "@/types/pokemon";
-import { useCollectionStore, useItems, useFavorites } from "@/store/collectionStore";
+import { useCollectionStore } from "@/store/collectionStore";
 import { searchCards } from "@/lib/pokemon-api";
 import { Bot, Send, Heart, Loader2, Mic, MicOff } from "lucide-react";
 
@@ -52,9 +52,7 @@ export default function AIChat({ onSelectCard }: AIChatProps) {
   const recognitionRef = useRef<SpeechRecognitionType | null>(null);
   const finalTranscriptRef = useRef("");
 
-  const collectionItems = useItems();
-  const favorites = useFavorites();
-  const { addFavorite, removeFavorite, isFavorite } = useCollectionStore();
+  const { items: collectionItems, favorites, addFavorite, removeFavorite, isFavorite } = useCollectionStore();
 
   // Initialize speech recognition
   useEffect(() => {
